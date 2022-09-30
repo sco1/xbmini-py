@@ -106,18 +106,21 @@ def _map_headers(
     return header_spec
 
 
-def parse_header(log_filepath: Path, header_prefix: str = ";") -> HeaderInfo:
-    """Parse log file information from the headers of the provided log."""
+def extract_header(log_filepath: Path, header_prefix: str = ";") -> list[str]:
+    """Extract header lines from the provided log file."""
     header_lines = []
     with log_filepath.open("r") as f:
-        for _lineno, line in enumerate(f):
+        for line in f:
             if line.startswith(header_prefix):
                 header_lines.append(line.lstrip(header_prefix).strip())
             else:
                 break
 
-    # Could do the reading & parsing in one shot but the double iteration seems more readable
-    # There aren't many header lines present, usually around 12
+    return header_lines
+
+
+def parse_header(header_lines: list[str], header_prefix: str = ";") -> HeaderInfo:
+    """Parse log file information from the provided header lines."""
     sensor_info = {}
     for line in header_lines:
         if line.startswith("Title"):
@@ -156,7 +159,7 @@ def parse_header(log_filepath: Path, header_prefix: str = ";") -> HeaderInfo:
 
     try:
         header_info = HeaderInfo(
-            n_header_lines=_lineno,
+            n_header_lines=len(header_lines),
             logger_type=logger_type,
             firmware_version=firmware_version,
             serial=device_serial,
