@@ -119,7 +119,7 @@ def extract_header(log_filepath: Path, header_prefix: str = ";") -> list[str]:
     return header_lines
 
 
-def parse_header(header_lines: list[str], header_prefix: str = ";") -> HeaderInfo:
+def parse_header(header_lines: list[str]) -> HeaderInfo:
     """Parse log file information from the provided header lines."""
     sensor_info = {}
     for line in header_lines:
