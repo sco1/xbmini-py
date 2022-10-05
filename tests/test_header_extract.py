@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from xbmini.parser import extract_header
 
 SAMPLE_LOG_FILE = """\
@@ -19,3 +21,11 @@ def test_header_extract(tmp_path: Path) -> None:
     tmp_log.write_text(SAMPLE_LOG_FILE)
 
     assert extract_header(tmp_log) == TRUTH_HEADER_LINES
+
+
+def test_no_header_raises(tmp_path: Path) -> None:
+    tmp_log = tmp_path / "log.CSV"
+    tmp_log.write_text("Hello world!")
+
+    with pytest.raises(ValueError):
+        extract_header(tmp_log)

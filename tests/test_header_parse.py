@@ -1,8 +1,13 @@
-from pathlib import Path
-
 import pytest
 
-from xbmini.parser import HeaderInfo, LoggerType, ParserError, SensorInfo, parse_header
+from xbmini.parser import (
+    HeaderInfo,
+    LoggerType,
+    ParserError,
+    SensorInfo,
+    SensorParseError,
+    parse_header,
+)
 
 SAMPLE_HEADER = [
     "Title, http://www.gcdataconcepts.com, HAM-IMU+alt, MPU9250 BMP280",
@@ -70,24 +75,26 @@ SAMPLE_HEADER_NO_SENSORS = [
 
 
 def test_no_sensors_raises() -> None:
-    with pytest.raises(ParserError):
+    with pytest.raises(SensorParseError):
         parse_header(SAMPLE_HEADER_NO_SENSORS)
 
 
 SAMPLE_HEADER_MISSING_SENSORS = [
     "Title, http://www.gcdataconcepts.com, HAM-IMU+alt, MPU9250 BMP280",
     "Version, 2108, Build date, Jan  1 2022,  SN:ABC122345F0420",
+    "MPU, SR (Hz), Sens (counts/unit), FullScale (units), Units",
     "Accel, 227, 1000, 16, g",
 ]
 
 
-def test_missing_sensors_raises(tmp_path: Path) -> None:
-    with pytest.raises(ParserError):
+def test_missing_sensors_raises() -> None:
+    with pytest.raises(SensorParseError):
         parse_header(SAMPLE_HEADER_MISSING_SENSORS)
 
 
 SAMPLE_HEADER_MISSING_INFO = [
     "Version, 2108, Build date, Jan  1 2022,  SN:ABC122345F0420",
+    "MPU, SR (Hz), Sens (counts/unit), FullScale (units), Units",
     "Accel, 227, 1000, 16, g",
     "Gyro, 227, 1, 250, dps",
     "Mag, 75, 1, 4900000, nT",
