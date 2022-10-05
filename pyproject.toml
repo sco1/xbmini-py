@@ -24,6 +24,7 @@ packages = [{include="xbmini"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
+pandas = "^1.5"
 
 [tool.poetry.dev-dependencies]
 black = "^22.8"

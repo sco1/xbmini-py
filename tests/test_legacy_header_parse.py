@@ -1,6 +1,4 @@
-import pytest
-
-from xbmini.parser import HeaderInfo, LoggerType, SensorInfo, parse_header
+from xbmini.heading_parser import HeaderInfo, LoggerType, SensorInfo, parse_header
 
 SAMPLE_LEGACY_HEADER = [
     "Title, http://www.gcdataconcepts.com, HAM-IMU+alt, MPU9250 BMP280",

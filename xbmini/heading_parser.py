@@ -226,13 +226,9 @@ def parse_header(header_lines: list[str]) -> HeaderInfo:
             sensor_lines.append(line)
             continue
 
-    if firmware_version != -1:
-        sensor_info = _parse_sensor_info(sensor_lines, firmware_version)
-    else:
-        raise ParserError("Unable to determine firmware version.")
-
     # If we didn't find all of the expected sensors then we should abort here to prevent issues
     # issues downstream
+    sensor_info = _parse_sensor_info(sensor_lines, firmware_version)
     if not sensor_info:
         raise SensorParseError("Unable to locate any sensor configuration header lines.")
 

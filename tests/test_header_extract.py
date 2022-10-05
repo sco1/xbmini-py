@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from xbmini.parser import extract_header
+from xbmini.heading_parser import extract_header
 
 SAMPLE_LOG_FILE = """\
 ;Title, http://www.gcdataconcepts.com, HAM-IMU+alt, MPU9250 BMP280

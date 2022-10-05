@@ -1,6 +1,6 @@
 import pytest
 
-from xbmini.parser import _map_headers
+from xbmini.heading_parser import _map_headers
 
 HEADER_MAP = {"f": "foo", "b": "bar"}
 

@@ -1,6 +1,6 @@
 import pytest
 
-from xbmini.parser import SensorInfo, SensorParseError
+from xbmini.heading_parser import SensorInfo, SensorParseError
 
 SAMPLE_HEADER_LINE = "Accel, 225, 1000, 16, g"
 TRUTH_SENSOR_INFO = SensorInfo(

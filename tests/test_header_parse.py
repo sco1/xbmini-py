@@ -1,6 +1,6 @@
 import pytest
 
-from xbmini.parser import (
+from xbmini.heading_parser import (
     HeaderInfo,
     LoggerType,
     ParserError,
