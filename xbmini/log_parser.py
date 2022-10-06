@@ -87,15 +87,35 @@ def _split_press_temp(
 
 @dataclass(slots=True)
 class XBMLog:  # noqa: D101
-    mpu_data: pd.DataFrame
-    press_temp_data: pd.DataFrame
+    mpu: pd.DataFrame
+    press_temp: pd.DataFrame
     header_info: HeaderInfo
     _is_merged: bool = False
     _is_trimmed: bool = False
 
     analysis_dt: dt.datetime = field(default_factory=dt.datetime.now)
-    ground_pressure: NUMERIC_T = 101_325
+    _ground_pressure: NUMERIC_T = 101_325  # Pascals
     total_rigged_weight: None | NUMERIC_T = None
+
+    def __post_init__(self) -> None:
+        # Calculate pressure altitude using the specified ground level pressure
+        self._calculate_pressure_altitude()
+
+    def _calculate_pressure_altitude(self) -> None:
+        self.press_temp["press_alt_m"] = 44_330 * (
+            1 - (self.press_temp["pressure"] / self.ground_pressure).pow(1 / 5.225)
+        )
+        self.press_temp["press_alt_ft"] = self.press_temp["press_alt_m"] * 3.2808
+
+    @property
+    def ground_pressure(self) -> NUMERIC_T:  # noqa: D102
+        return self._ground_pressure
+
+    @ground_pressure.setter
+    def ground_pressure(self, pressure: NUMERIC_T) -> None:
+        """Recalculate pressure altitudes if the ground pressure changes."""
+        self._ground_pressure = pressure
+        self._calculate_pressure_altitude()
 
     @classmethod
     def from_log_file(
@@ -144,6 +164,4 @@ class XBMLog:  # noqa: D101
         )
         press_temp, mpu_data = _split_press_temp(full_data)
 
-        return cls(
-            mpu_data=mpu_data, press_temp_data=press_temp, header_info=header_info, _is_merged=True
-        )
+        return cls(mpu=mpu_data, press_temp=press_temp, header_info=header_info, _is_merged=True)
