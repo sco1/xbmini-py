@@ -17,7 +17,8 @@ CONVERSION_GROUPS = {
     "Mag": ("mag_x", "mag_y", "mag_z"),
 }
 
-PRESS_TEMP_COLS = ["pressure", "temperature"]  # Pandas needs this as a list for indexing
+PRESS_TEMP_COLS = ["pressure", "temperature"]  # Pandas needs as a list for indexing
+QUATERNION_COLS = ["quat_x", "quat_y", "quat_z", "quat_w"]  # Pandas needs as a list for indexing
 
 
 class HasSensitivity(t.Protocol):  # noqa: D101
@@ -56,6 +57,16 @@ def load_log(
     for sensor, column_group in conversion_groups.items():
         for column in column_group:
             full_data[column] = full_data[column] / sensor_info[sensor].sensitivity
+
+    # Convert temperature from mill-degree C to C
+    full_data["temperature"] = full_data["temperature"] / 1000
+
+    # Convert quaternion data, incoming as 16bit values, then normalize with RMS
+    full_data[QUATERNION_COLS] = full_data[QUATERNION_COLS] / 65536
+    q_rms = full_data[QUATERNION_COLS].pow(2).sum(axis=1).pow(1 / 2)
+    for col in QUATERNION_COLS:
+        # Not sure what the magic pandas invocation is do do this without a loop
+        full_data[col] = full_data[col] / q_rms
 
     return full_data, header_info
 
