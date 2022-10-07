@@ -21,7 +21,7 @@ IMU_SENSORS = ("Accel", "Gyro", "Mag")
 
 PRESS_TEMP_COLS = ["pressure", "temperature"]  # Pandas needs as a list for indexing
 
-ROLLING_WINDOW_WIDTH = 200
+ROLLING_WINDOW_WIDTH = "200ms"
 
 
 class HasSensitivity(t.Protocol):  # noqa: D101
@@ -32,17 +32,30 @@ def load_log(
     log_filepath: Path,
     sensor_groups: dict[str, list[str]] = SENSOR_GROUPS,
     sensitivity_override: None | t.Mapping[str, HasSensitivity] = None,
-    rolling_window_width: int = ROLLING_WINDOW_WIDTH,
+    rolling_window_width: int | str = ROLLING_WINDOW_WIDTH,
 ) -> tuple[pd.DataFrame, HeaderInfo]:
     """
     Load data from the provided XBM log file.
+
+    Once the raw data is loaded, the following transformations and derivations are performed:
+        * Time values are converted to a `pandas.TimedeltaIndex` and used as the `DataFrame` index
+        * Accelerometer, Gyroscope, and Magnetometer data is converted from raw counts to their
+        respective units
+        * Temperature is converted from mill-degree C to C
+        * Quaternions are converted from raw counts and normalized with RMS
+        * A `"total_accel"` column is calculated from the vector sum of the acceleration components
+        * A `"total_accel_rolling"` column is calculated using a rolling mean of the `"total_accel"`
+        values
+
+    `rolling_window_width` may be specified in a format understood by `pandas.DataFrame.rolling`
 
     To work around known issues with some firmware where the sensor headers do not provide the
     correct counts/unit conversion constant, `sensitivity_override` may be optionally specified to
     manually provide these constants.
     """
+    # Could probably combine these 2 steps using the same open file object if performance becomes
+    # an issue
     header_info = parse_header(extract_header(log_filepath))
-
     full_data = pd.read_csv(
         log_filepath,
         skiprows=header_info.n_header_lines,
@@ -51,6 +64,8 @@ def load_log(
         index_col="time",
         comment=";",
     )
+    # Convert time index to timedelta so we can use rolling time windows later
+    full_data.index = pd.TimedeltaIndex(full_data.index, unit="S")
 
     # Convert measurements from raw counts to measured values
     if sensitivity_override:
@@ -180,10 +195,17 @@ class XBMLog:  # noqa: D101
         correct counts/unit conversion constant, `sensitivity_override` may be optionally specified
         to manually provide these constants.
         """
+        # Grab the header info from the first file so we don't have to worry in the list comp
         header_info = parse_header(extract_header(log_filepaths[0]))
         full_data = pd.concat(
             [
-                load_log(log_file, sensor_groups, sensitivity_override, rolling_window_width)[0]
+                # Skip the header info since we've already grabbed it
+                load_log(
+                    log_filepath=log_file,
+                    sensor_groups=sensor_groups,
+                    sensitivity_override=sensitivity_override,
+                    rolling_window_width=rolling_window_width,
+                )[0]
                 for log_file in log_filepaths
             ]
         )
