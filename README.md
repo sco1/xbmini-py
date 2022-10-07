@@ -6,4 +6,9 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-black)](https://github.com/psf/black)
 [![Open in Visual Studio Code](https://img.shields.io/badge/Open%20in-VSCode.dev-blue)](https://vscode.dev/github.com/sco1/xbmini-py)
 
-Python Toolkit for the GCDC HAM
+Python Toolkit for the [GCDC HAM](http://www.gcdataconcepts.com/ham.html)
+
+🚨 This is a beta project. User-facing functionality is still under development 🚨
+
+## Known Firmware Compatibility
+This package is currently tested against firmware versions `1379` and `2108`, compatibility with other firmware versions is not guaranteed.
