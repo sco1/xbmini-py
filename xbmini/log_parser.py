@@ -106,7 +106,7 @@ def _split_press_temp(
     The columns are dropped from the incoming `DataFrame`, and the modified dataframe is returned.
     """
     press_temp_df = log_df[columns].dropna(axis=0)
-    log_df = log_df.drop(columns, axis=1, errors="ignore")
+    log_df = log_df.drop(columns, axis=1)
 
     return press_temp_df, log_df
 
@@ -156,7 +156,8 @@ class XBMLog:  # noqa: D101
         log_filepath: Path,
         sensor_groups: dict[str, list[str]] = SENSOR_GROUPS,
         sensitivity_override: None | t.Mapping[str, HasSensitivity] = None,
-        rolling_window_width: int = ROLLING_WINDOW_WIDTH,
+        rolling_window_width: int | str = ROLLING_WINDOW_WIDTH,
+        normalize_time: bool = False,
     ) -> XBMLog:
         """
         Build a log instance from the provided log file.
@@ -164,6 +165,9 @@ class XBMLog:  # noqa: D101
         To work around known issues with some firmware where the sensor headers do not provide the
         correct counts/unit conversion constant, `sensitivity_override` may be optionally specified
         to manually provide these constants.
+
+        The `normalize_time` flag may be set to normalize the time index so it starts at 0 seconds,
+        helping for cases where the XBM starts at some abnormally large time index.
         """
         # Since we're cheating and using the multi-load method, we have to set the merged flag back
         # to False before returning
@@ -172,6 +176,7 @@ class XBMLog:  # noqa: D101
             sensor_groups=sensor_groups,
             sensitivity_override=sensitivity_override,
             rolling_window_width=rolling_window_width,
+            normalize_time=normalize_time,
         )
         log._is_merged = False
 
@@ -183,7 +188,8 @@ class XBMLog:  # noqa: D101
         log_filepaths: t.Sequence[Path],
         sensor_groups: dict[str, list[str]] = SENSOR_GROUPS,
         sensitivity_override: None | t.Mapping[str, HasSensitivity] = None,
-        rolling_window_width: int = ROLLING_WINDOW_WIDTH,
+        rolling_window_width: int | str = ROLLING_WINDOW_WIDTH,
+        normalize_time: bool = False,
     ) -> XBMLog:
         """
         Build a log instance by joining the provided log files.
@@ -194,6 +200,9 @@ class XBMLog:  # noqa: D101
         To work around known issues with some firmware where the sensor headers do not provide the
         correct counts/unit conversion constant, `sensitivity_override` may be optionally specified
         to manually provide these constants.
+
+        The `normalize_time` flag may be set to normalize the time index so it starts at 0 seconds,
+        helping for cases where the XBM starts at some abnormally large time index.
         """
         # Grab the header info from the first file so we don't have to worry in the list comp
         header_info = parse_header(extract_header(log_filepaths[0]))
@@ -209,6 +218,10 @@ class XBMLog:  # noqa: D101
                 for log_file in log_filepaths
             ]
         )
+
+        if normalize_time:
+            full_data.index = full_data.index - full_data.index[0]
+
         press_temp, mpu_data = _split_press_temp(full_data)
 
         return cls(
