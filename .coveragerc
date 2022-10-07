@@ -1,9 +1,0 @@
-[run]
-parallel = True
-
-[report]
-exclude_lines =
-    pragma: no cover
-    if TYPE_CHECKING:
-    if t.TYPE_CHECKING:
-    if typing.TYPE_CHECKING:
