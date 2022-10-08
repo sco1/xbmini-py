@@ -263,3 +263,8 @@ def parse_header(header_lines: list[str]) -> HeaderInfo:
         )
 
     return header_info
+
+
+def parse_from_file(log_filepath: Path, header_prefix: str = ";") -> HeaderInfo:  # pragma: no cover
+    """Helper pipeline to receive `HeaderInfo` directly from the provided log file."""
+    return parse_header(extract_header(log_filepath, header_prefix))

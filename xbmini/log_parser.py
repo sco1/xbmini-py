@@ -137,11 +137,11 @@ class XBMLog:  # noqa: D101
         self.press_temp["press_alt_ft"] = self.press_temp["press_alt_m"] * 3.2808
 
     @property
-    def logger_id(self) -> str:  # noqa: D102
+    def logger_id(self) -> str:  # noqa: D102  # pragma: no cover
         return self.header_info.serial
 
     @property
-    def ground_pressure(self) -> NUMERIC_T:  # noqa: D102
+    def ground_pressure(self) -> NUMERIC_T:  # noqa: D102  # pragma: no cover
         return self._ground_pressure
 
     @ground_pressure.setter

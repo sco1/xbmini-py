@@ -7,24 +7,15 @@ import pandas as pd
 from xbmini.heading_parser import SensorInfo
 from xbmini.log_parser import _split_press_temp, load_log
 
-SAMPLE_LOG_FILE = """\
-;Title, http://www.gcdataconcepts.com, HAM-IMU+alt, MPU9250 BMP280
-;Version, 2108, Build date, Jan  1 2022,  SN:ABC122345F0420
-;Start_time, 2022-09-26, 08:13:29.030
-;Uptime, 6,sec,  Vbat, 4086, mv, EOL, 3500, mv
-;MPU, SR (Hz), Sens (counts/unit), FullScale (units), Units
-;Accel, 225, 1000, 16, g
-;Gyro, 225, 1, 250, dps
-;Mag, 75, 1, 4900000, nT
-;BMP280 SI, 0.500,s
-;Deadband, 0, counts
-;DeadbandTimeout, 5.000,sec
-;Time, Ax, Ay, Az, Gx, Gy, Gz, Qw, Qx, Qy, Qz, Mx, My, Mz, P, T
-0.005920,1121,-15,24,-1,2,0,0.782,-0.028,-0.620,-0.039,7349,-68100,47099,98405,22431
-"""
+
+def test_log_loader(tmp_log: Path) -> None:
+    df, _ = load_log(tmp_log)
+    pd.testing.assert_frame_equal(df, TRUTH_DF, check_exact=False)
+
+
 TRUTH_DF = pd.DataFrame(
     {
-        "time": [dt.timedelta(seconds=0.005920)],
+        "time": [dt.timedelta(seconds=0.01)],
         "accel_x": [1.121],
         "accel_y": [-0.015],
         "accel_z": [0.024],
@@ -44,14 +35,6 @@ TRUTH_DF = pd.DataFrame(
         "total_accel_rolling": [1.121357],
     }
 ).set_index("time")
-
-
-def test_log_loader(tmp_path: Path) -> None:
-    tmp_log = tmp_path / "log.CSV"
-    tmp_log.write_text(SAMPLE_LOG_FILE)
-
-    df, _ = load_log(tmp_log)
-    pd.testing.assert_frame_equal(df, TRUTH_DF, check_exact=False)
 
 
 SENS_OVERRIDE = {
@@ -80,7 +63,7 @@ SENS_OVERRIDE = {
 
 TRUTH_DF_SENS_OVERRIDE = pd.DataFrame(
     {
-        "time": [dt.timedelta(seconds=0.005920)],
+        "time": [dt.timedelta(seconds=0.01)],
         "accel_x": [0.547363],
         "accel_y": [-0.0073242],
         "accel_z": [0.0117187],
@@ -102,10 +85,7 @@ TRUTH_DF_SENS_OVERRIDE = pd.DataFrame(
 ).set_index("time")
 
 
-def test_log_loader_sens_override(tmp_path: Path) -> None:
-    tmp_log = tmp_path / "log.CSV"
-    tmp_log.write_text(SAMPLE_LOG_FILE)
-
+def test_log_loader_sens_override(tmp_log: Path) -> None:
     df, _ = load_log(tmp_log, sensitivity_override=SENS_OVERRIDE)
     pd.testing.assert_frame_equal(df, TRUTH_DF_SENS_OVERRIDE, check_exact=False)
 

@@ -20,4 +20,5 @@ extend-ignore=
 extend-exclude=
     .venv,
 per-file-ignores =
+    tests/conftest.py:D103 E501,
     tests/test_*.py:D103 E501,

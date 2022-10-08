@@ -33,7 +33,7 @@ def accel_plot(
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     fig.add_trace(
         go.Scatter(
-            x=log_data.mpu.index,
+            x=log_data.mpu.index.total_seconds(),
             y=log_data.mpu["total_accel_rolling"],
             name="Total Accel",
             line_color="royalblue",
@@ -43,7 +43,7 @@ def accel_plot(
     )
     fig.add_trace(
         go.Scatter(
-            x=log_data.press_temp.index,
+            x=log_data.press_temp.index.total_seconds(),
             y=log_data.press_temp["press_alt_ft"],
             name="Pressure Altitude",
             line_color="firebrick",
