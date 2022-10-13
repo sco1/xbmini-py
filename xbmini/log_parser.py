@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import typing as t
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 import pandas as pd
@@ -121,14 +122,28 @@ class XBMLog:  # noqa: D101
     drop_id: str | None = None
     _is_merged: bool = False
     _is_trimmed: bool = False
+    _is_from_processed: bool = False
 
     analysis_dt: dt.datetime = field(default_factory=dt.datetime.now)
     _ground_pressure: NUMERIC_T = 101_325  # Pascals
     total_rigged_weight: None | NUMERIC_T = None
 
+    _serialize_metadata_skip_fields: frozenset[str] = frozenset(
+        (
+            "mpu",
+            "press_temp",
+            "drop_date",
+            "analysis_dt",
+            "header_info",
+            "_serialize_metadata_skip_fields",
+        )
+    )
+
     def __post_init__(self) -> None:
         # Calculate pressure altitude using the specified ground level pressure
-        self._calculate_pressure_altitude()
+        # Skip if we're loading a log that's already been processed
+        if not self._is_from_processed:
+            self._calculate_pressure_altitude()
 
     def _calculate_pressure_altitude(self) -> None:
         self.press_temp["press_alt_m"] = 44_330 * (
@@ -150,8 +165,38 @@ class XBMLog:  # noqa: D101
         self._ground_pressure = pressure
         self._calculate_pressure_altitude()
 
+    def _serialize_metadata(self) -> str:
+        """Dump the instance into a serializable dictionary."""
+        # Rather than some complicated instance matching logic, just dump what's serializable first
+        # and add in things that need custom handling
+        out_dict = {
+            _field.name: getattr(self, _field.name)
+            for _field in fields(self)
+            if _field.name not in self._serialize_metadata_skip_fields
+        }
+
+        # Serialize the remainder. _serialize_metadata_skip_fields is ignored
+        out_dict["analysis_dt"] = self.analysis_dt.timestamp()
+        out_dict["drop_date"] = self.drop_date.isoformat() if self.drop_date else None
+        out_dict["header_info"] = self.header_info.to_dict()
+
+        return json.dumps(out_dict)
+
+    def to_csv(self, out_filepath: Path, header_prefix: str = ";") -> None:
+        """
+        Dump the current class instance into the provided CSV filepath.
+
+        Logger metadata is serialized into JSON and inserted as a single line at the top of the
+        file using the provided `header_prefix`. The MPU and Pressure/Temperature dataframes are
+        horizontally concatenated and dumped by Pandas as CSV.
+        """
+        full_data = pd.concat((self.mpu, self.press_temp), axis=1)
+        with out_filepath.open("w", newline="") as f:
+            f.write(f"{header_prefix}{self._serialize_metadata()}\n")
+            full_data.to_csv(f)
+
     @classmethod
-    def from_log_file(
+    def from_raw_log_file(
         cls,
         log_filepath: Path,
         sensor_groups: dict[str, list[str]] = SENSOR_GROUPS,
@@ -171,7 +216,7 @@ class XBMLog:  # noqa: D101
         """
         # Since we're cheating and using the multi-load method, we have to set the merged flag back
         # to False before returning
-        log = cls.from_multi_log(
+        log = cls.from_multi_raw_log(
             log_filepaths=(log_filepath,),
             sensor_groups=sensor_groups,
             sensitivity_override=sensitivity_override,
@@ -183,7 +228,7 @@ class XBMLog:  # noqa: D101
         return log
 
     @classmethod
-    def from_multi_log(
+    def from_multi_raw_log(
         cls,
         log_filepaths: t.Sequence[Path],
         sensor_groups: dict[str, list[str]] = SENSOR_GROUPS,
@@ -230,3 +275,17 @@ class XBMLog:  # noqa: D101
             header_info=header_info,
             _is_merged=True,
         )
+
+    @classmethod
+    def from_processed_csv(cls, in_filepath: Path, header_prefix: str = ";") -> XBMLog:
+        """
+        Rebuild a class instance from the provided CSV filepath.
+
+        It is assumed that logger metadata has been serialized into JSON and inserted as a single
+        header line at the top of the file using the provided `header_prefix`.
+        """
+        raise NotImplementedError
+
+
+def _deserialize_metadata(in_json: str) -> dict:
+    raise NotImplementedError

@@ -13,12 +13,12 @@ LOG_FILE_DATA_T = tuple[pd.DataFrame, pd.DataFrame, HeaderInfo]
 # I don't think we need to test much for these two constructors beyond their flags, since they're
 # just stuffing dataframes into attributes & we're already testing their parsing elsewhere
 def test_xbm_from_log(tmp_log: Path) -> None:
-    log_obj = XBMLog.from_log_file(tmp_log)
+    log_obj = XBMLog.from_raw_log_file(tmp_log)
     assert log_obj._is_merged is False
 
 
 def test_xbm_from_multi(tmp_multi_log: list[Path]) -> None:
-    log_obj = XBMLog.from_multi_log(tmp_multi_log)
+    log_obj = XBMLog.from_multi_raw_log(tmp_multi_log)
 
     check_index = pd.TimedeltaIndex((dt.timedelta(seconds=0.01), dt.timedelta(seconds=0.02)))
     pd.testing.assert_index_equal(log_obj.mpu.index, check_index, check_names=False)
@@ -27,7 +27,7 @@ def test_xbm_from_multi(tmp_multi_log: list[Path]) -> None:
 
 
 def test_xbm_from_multi_normalized_timestamp(tmp_multi_log: list[Path]) -> None:
-    log_obj = XBMLog.from_multi_log(tmp_multi_log, normalize_time=True)
+    log_obj = XBMLog.from_multi_raw_log(tmp_multi_log, normalize_time=True)
 
     check_index = pd.TimedeltaIndex((dt.timedelta(seconds=0), dt.timedelta(seconds=0.01)))
     pd.testing.assert_index_equal(log_obj.mpu.index, check_index, check_names=False)

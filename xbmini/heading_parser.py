@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import json
 import re
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, fields
 from enum import Enum
 from pathlib import Path
 
@@ -128,6 +129,21 @@ class SensorInfo:  # noqa: D101
 
         return sensor_info
 
+    def to_dict(self) -> dict[str, int | str]:
+        """Dump the instance into a dictionary."""
+        # Because our fields are all serializable, we can just serialize natively
+        return asdict(self)
+
+    def to_json(self) -> str:
+        """Dump the instance into a JSON string."""
+        return json.dumps(self.to_dict())
+
+    @classmethod
+    def from_json(cls, in_json: str) -> SensorInfo:
+        """Rebuild a `SensorInfo` instance from the provided JSON string."""
+        # Because our fields are all serializable, we can just use the constructor natively
+        return cls(**json.loads(in_json))
+
 
 @dataclass
 class HeaderInfo:  # noqa: D101
@@ -137,6 +153,42 @@ class HeaderInfo:  # noqa: D101
     serial: str
     sensors: dict[str, SensorInfo]
     header_spec: list[str]
+
+    _custom_serialize: frozenset[str] = frozenset(("logger_type", "sensors", "_custom_serialize"))
+
+    def to_dict(self) -> dict[str, str | dict[str, dict[str, int | str]] | list[str]]:
+        """Dump the instance into a serializable dictionary."""
+        # Rather than some complicated instance matching logic, just dump what's serializable first
+        # and add in things that need custom handling
+        out_dict = {
+            field.name: getattr(self, field.name)
+            for field in fields(self)
+            if field.name not in self._custom_serialize
+        }
+
+        # Serialize the remainder. _custom_serialize is ignored
+        out_dict["logger_type"] = self.logger_type.value
+        out_dict["sensors"] = {
+            sensor_name: sensor_obj.to_dict() for sensor_name, sensor_obj in self.sensors.items()
+        }
+
+        return out_dict
+
+    def to_json(self) -> str:
+        """Dump the instance into a JSON string."""
+        return json.dumps(self.to_dict())
+
+    @classmethod
+    def from_json(cls, in_json: str) -> HeaderInfo:
+        """Rebuild a `HeaderInfo` instance from the provided JSON string."""
+        tmp_dict = json.loads(in_json)
+        tmp_dict["logger_type"] = LoggerType(tmp_dict["logger_type"])
+        tmp_dict["sensors"] = {
+            sensor_name: SensorInfo(**sensor_dict)
+            for sensor_name, sensor_dict in tmp_dict["sensors"].items()
+        }
+
+        return cls(**tmp_dict)
 
 
 def _map_headers(
