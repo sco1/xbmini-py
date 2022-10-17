@@ -20,7 +20,8 @@ SENSOR_GROUPS = {
 }
 IMU_SENSORS = ("Accel", "Gyro", "Mag")
 
-PRESS_TEMP_COLS = ["pressure", "temperature"]  # Pandas needs as a list for indexing
+# Pandas needs as a list for indexing
+PRESS_TEMP_COLS = ["pressure", "temperature", "press_alt_m", "press_alt_ft"]
 
 ROLLING_WINDOW_WIDTH = "200ms"
 
@@ -106,8 +107,9 @@ def _split_press_temp(
 
     The columns are dropped from the incoming `DataFrame`, and the modified dataframe is returned.
     """
-    press_temp_df = log_df[columns].dropna(axis=0)
-    log_df = log_df.drop(columns, axis=1)
+    # Only try to index & drop the columns that exist (e.g. press_alt_ft might not exist yet)
+    press_temp_df = log_df[log_df.columns.intersection(columns)].dropna(axis=0)
+    log_df = log_df.drop(columns, axis=1, errors="ignore")
 
     return press_temp_df, log_df
 
@@ -122,7 +124,6 @@ class XBMLog:  # noqa: D101
     drop_id: str | None = None
     _is_merged: bool = False
     _is_trimmed: bool = False
-    _is_from_processed: bool = False
 
     analysis_dt: dt.datetime = field(default_factory=dt.datetime.now)
     _ground_pressure: NUMERIC_T = 101_325  # Pascals
@@ -141,9 +142,7 @@ class XBMLog:  # noqa: D101
 
     def __post_init__(self) -> None:
         # Calculate pressure altitude using the specified ground level pressure
-        # Skip if we're loading a log that's already been processed
-        if not self._is_from_processed:
-            self._calculate_pressure_altitude()
+        self._calculate_pressure_altitude()
 
     def _calculate_pressure_altitude(self) -> None:
         self.press_temp["press_alt_m"] = 44_330 * (
@@ -284,8 +283,33 @@ class XBMLog:  # noqa: D101
         It is assumed that logger metadata has been serialized into JSON and inserted as a single
         header line at the top of the file using the provided `header_prefix`.
         """
-        raise NotImplementedError
+        with in_filepath.open("r") as f:
+            metadata_header = f.readline().lstrip(header_prefix).strip()
+            full_data = pd.read_csv(f, index_col=0)
 
+        full_data.index = pd.TimedeltaIndex(full_data.index)
+        metadata = cls._deserialize_metadata(metadata_header)
+        press_temp, mpu = _split_press_temp(full_data)
 
-def _deserialize_metadata(in_json: str) -> dict:
-    raise NotImplementedError
+        return cls(mpu=mpu, press_temp=press_temp, **metadata)
+
+    @staticmethod
+    def _deserialize_metadata(in_json: str) -> dict:
+        """
+        Reconstruct the incoming processed XBM log metadata from the provided JSON string.
+
+        Most fields can be loaded as-is, only requiring the following to get additional attention:
+            * `drop_date`
+            * `analysis_dt`
+            * `header_info`
+        """
+        metadata: dict = json.loads(in_json)
+        metadata["drop_date"] = (
+            dt.date.fromisoformat(metadata["drop_date"]) if metadata["drop_date"] else None
+        )
+        metadata["analysis_dt"] = (
+            dt.datetime.fromtimestamp(metadata["analysis_dt"]) if metadata["analysis_dt"] else None
+        )
+        metadata["header_info"] = HeaderInfo.from_raw_dict(metadata["header_info"])
+
+        return metadata

@@ -179,9 +179,13 @@ class HeaderInfo:  # noqa: D101
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_json(cls, in_json: str) -> HeaderInfo:
-        """Rebuild a `HeaderInfo` instance from the provided JSON string."""
-        tmp_dict = json.loads(in_json)
+    def from_raw_dict(cls, tmp_dict: dict) -> HeaderInfo:
+        """
+        Rebuild a `HeaderInfo` instance from the provided dictionary.
+
+        NOTE: It is assumed that the `"logger_type"` and `"sensors"` fields contain serialized
+        versions of their respective object types that require deserialization into instances.
+        """
         tmp_dict["logger_type"] = LoggerType(tmp_dict["logger_type"])
         tmp_dict["sensors"] = {
             sensor_name: SensorInfo(**sensor_dict)
@@ -189,6 +193,11 @@ class HeaderInfo:  # noqa: D101
         }
 
         return cls(**tmp_dict)
+
+    @classmethod
+    def from_json(cls, in_json: str) -> HeaderInfo:
+        """Rebuild a `HeaderInfo` instance from the provided JSON string."""
+        return cls.from_raw_dict(json.loads(in_json))
 
 
 def _map_headers(
