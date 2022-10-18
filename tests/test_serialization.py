@@ -40,7 +40,8 @@ def test_xbm_roundtrip(tmp_log: Path) -> None:
     tmp_csv = tmp_log.parent / "test_csv.csv"
     log.to_csv(tmp_csv)
 
-    # Test dataframes separately until XBMLog's __eq__ is redefined
+    # Test dataframes separately since XBMLog doesn't have a custom __eq__
+    # Will throw warnings about ambiguous DF comparisons otherwise
     test_log = XBMLog.from_processed_csv(tmp_csv)
     for field in fields(log):
         if isinstance(getattr(test_log, field.name), pd.DataFrame):
