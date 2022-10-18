@@ -22,3 +22,4 @@ extend-exclude=
 per-file-ignores =
     tests/conftest.py:D103 E501,
     tests/test_*.py:D103 E501,
+    xbmini/trim_app.py: D103,
