@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import io
 import json
 import typing as t
 from dataclasses import dataclass, field, fields
@@ -276,16 +277,20 @@ class XBMLog:  # noqa: D101
         )
 
     @classmethod
-    def from_processed_csv(cls, in_filepath: Path, header_prefix: str = ";") -> XBMLog:
+    def from_processed_csv(cls, in_log: Path | io.StringIO, header_prefix: str = ";") -> XBMLog:
         """
         Rebuild a class instance from the provided CSV filepath.
 
         It is assumed that logger metadata has been serialized into JSON and inserted as a single
         header line at the top of the file using the provided `header_prefix`.
         """
-        with in_filepath.open("r") as f:
-            metadata_header = f.readline().lstrip(header_prefix).strip()
-            full_data = pd.read_csv(f, index_col=0)
+        if isinstance(in_log, Path):
+            with in_log.open("r") as f:
+                metadata_header = f.readline().lstrip(header_prefix).strip()
+                full_data = pd.read_csv(f, index_col=0)
+        elif isinstance(in_log, io.StringIO):
+            metadata_header = in_log.readline().lstrip(header_prefix).strip()
+            full_data = pd.read_csv(in_log, index_col=0)
 
         full_data.index = pd.TimedeltaIndex(full_data.index)
         metadata = cls._deserialize_metadata(metadata_header)
