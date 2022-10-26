@@ -26,6 +26,8 @@ PRESS_TEMP_COLS = ["pressure", "temperature", "press_alt_m", "press_alt_ft"]
 
 ROLLING_WINDOW_WIDTH = "200ms"
 
+DEFAULT_HEADER_PREFIX = ";"
+
 
 class HasSensitivity(t.Protocol):  # noqa: D101
     sensitivity: int
@@ -182,7 +184,7 @@ class XBMLog:  # noqa: D101
 
         return json.dumps(out_dict)
 
-    def to_csv(self, out_filepath: Path, header_prefix: str = ";") -> None:
+    def to_csv(self, out_filepath: Path, header_prefix: str = DEFAULT_HEADER_PREFIX) -> None:
         """
         Dump the current class instance into the provided CSV filepath.
 
@@ -190,10 +192,22 @@ class XBMLog:  # noqa: D101
         file using the provided `header_prefix`. The MPU and Pressure/Temperature dataframes are
         horizontally concatenated and dumped by Pandas as CSV.
         """
+        out_filepath.write_text(self._to_string(header_prefix))
+
+    def _to_string(self, header_prefix: str = DEFAULT_HEADER_PREFIX) -> str:
+        """
+        Dump the current class instance to a string.
+
+        Logger metadata is serialized into JSON and inserted as a single line at the beginning of
+        the string using the provided `header_prefix`. The MPU and Pressure/Temperature dataframes
+        are horizontally concatenated and dumped by Pandas as CSV.
+        """
         full_data = pd.concat((self.mpu, self.press_temp), axis=1)
-        with out_filepath.open("w", newline="") as f:
-            f.write(f"{header_prefix}{self._serialize_metadata()}\n")
-            full_data.to_csv(f)
+        buff = io.StringIO(newline="")
+        buff.write(f"{header_prefix}{self._serialize_metadata()}\n")
+        full_data.to_csv(buff)
+
+        return buff.getvalue()
 
     @classmethod
     def from_raw_log_file(
@@ -277,7 +291,9 @@ class XBMLog:  # noqa: D101
         )
 
     @classmethod
-    def from_processed_csv(cls, in_log: Path | io.StringIO, header_prefix: str = ";") -> XBMLog:
+    def from_processed_csv(
+        cls, in_log: Path | io.StringIO, header_prefix: str = DEFAULT_HEADER_PREFIX
+    ) -> XBMLog:
         """
         Rebuild a class instance from the provided CSV filepath.
 
@@ -291,6 +307,8 @@ class XBMLog:  # noqa: D101
         elif isinstance(in_log, io.StringIO):
             metadata_header = in_log.readline().lstrip(header_prefix).strip()
             full_data = pd.read_csv(in_log, index_col=0)
+        else:
+            raise ValueError(f"Unsupported input type specified: {type(in_log)}")
 
         full_data.index = pd.TimedeltaIndex(full_data.index)
         metadata = cls._deserialize_metadata(metadata_header)

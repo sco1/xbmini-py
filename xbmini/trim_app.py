@@ -1,12 +1,14 @@
 import base64
+import datetime as dt
 import io
+import os
 
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Dash, dcc, exceptions, html
-from dash.dependencies import Input, Output
+from dash import Dash, dcc, exceptions, html, no_update
+from dash.dependencies import Input, Output, State
 
-from xbmini.log_parser import XBMLog
+from xbmini.log_parser import XBMLog, _split_press_temp
 from xbmini.viz import make_plot
 
 app = Dash(__name__)
@@ -30,7 +32,8 @@ app.layout = html.Div(
         dcc.Store(id="log-data"),
         dcc.Store(id="log-metadata"),
         dcc.Graph(id="press-alt-plot", style={"width": "75%"}),
-        html.Button(id="trim-data", children="Trim Data"),
+        html.Button(id="trim-data-button", children="Trim Data"),
+        dcc.Download(id="dl-trimmed-log"),
         html.Div(id="trim-msg"),
     ],
 )
@@ -40,27 +43,36 @@ app.layout = html.Div(
     Output("log-data", "data"),
     Output("log-metadata", "data"),
     Input("upload-log-data", "contents"),
+    prevent_initial_call=True,
 )
 def process_upload(contents: str) -> tuple[str, str]:
+    """
+    Deserialize the provided CSV File into its metadata and `pd.DataFrame` components.
+
+    It is assumed that the upload component is limited to a single file, so the file's `contents`
+    are provided as a base64 encoded string. The CSV is assumed to contain a serialized instance of
+    `XBMLog`.
+
+    The log's data is concatenated and sent to the `log-data` store as JSON, and its metadata
+    is re-serialized to JSON and sent to the `log-metadata` store.
+    """
     if contents is not None:
         decoded = base64.b64decode(contents.split(",")[1])
         log = XBMLog.from_processed_csv(io.StringIO(decoded.decode("utf-8")))
     else:
         raise exceptions.PreventUpdate
 
-    # It's easier if we concatenate and store the data separately from the metadata, we'll only
-    # need the metadata again when it's time to write back to disk
     full_df = pd.concat((log.mpu, log.press_temp), axis=1)
-    return full_df.to_json(date_unit="ns"), log._serialize_metadata()
+    return _serialize_df(full_df), log._serialize_metadata()
 
 
 @app.callback(
     Output("press-alt-plot", "figure"),
     Input("log-data", "data"),
+    prevent_initial_call=True,
 )
-def build_plot(log_data: str) -> go.Figure:
-    log_df = pd.read_json(log_data)
-    log_df.index = pd.TimedeltaIndex(log_df.index, unit="ns")
+def build_plot(log_data: str) -> go.Figure:  # noqa: D103
+    log_df = _deserialze_df(log_data)
     fig = make_plot(
         xdata=log_df.index.total_seconds(),
         ydata=log_df["press_alt_ft"],
@@ -69,6 +81,58 @@ def build_plot(log_data: str) -> go.Figure:
         title="Sample Plot",
     )
     return fig
+
+
+@app.callback(
+    Output("dl-trimmed-log", "data"),
+    Output("trim-msg", "children"),
+    Input("trim-data-button", "n_clicks"),
+    State("log-data", "data"),
+    State("log-metadata", "data"),
+    State("press-alt-plot", "relayoutData"),
+    State("upload-log-data", "filename"),
+    prevent_initial_call=True,
+)
+def trim_plot_data(
+    n_clicks: int,
+    log_data: str,
+    log_metadata: str,
+    layout_data: dict[str, float],
+    in_filename: str,
+) -> tuple[dict, str]:
+    """Trim the stored `pd.DataFrame` using the current zoom limits & export to CSV."""
+    # Skip trimming if the plot hasn't actually been zoomed
+    if layout_data is None or layout_data.get("autosize"):
+        return no_update, "Please window the data before trimming."
+
+    log_df = _deserialze_df(log_data)
+    window = [
+        dt.timedelta(seconds=layout_data["xaxis.range[0]"]),
+        dt.timedelta(seconds=layout_data["xaxis.range[1]"]),
+    ]
+    trimmed_df = log_df.loc[(log_df.index >= window[0]) & (log_df.index <= window[1])]
+
+    metadata = XBMLog._deserialize_metadata(log_metadata)
+    press_temp, mpu = _split_press_temp(trimmed_df)
+    log = XBMLog(mpu, press_temp, **metadata)
+    log._is_merged = True
+
+    name, ext = os.path.splitext(in_filename)
+    out_filename = f"{name}_trimmed{ext}"
+
+    return dict(content=log._to_string(), filename=out_filename), "Trimmed file saved successfully!"
+
+
+def _serialize_df(in_df: pd.DataFrame) -> str:
+    ser: str = in_df.to_json(date_unit="ns")
+    return ser
+
+
+def _deserialze_df(in_json: str) -> pd.DataFrame:
+    log_df = pd.read_json(in_json, date_unit="ns")
+    # Set the index name explicitly since none of the to_json() orient options will preserve it
+    log_df.index = pd.TimedeltaIndex(log_df.index, unit="ns").rename("time")
+    return log_df
 
 
 if __name__ == "__main__":

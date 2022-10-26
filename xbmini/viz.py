@@ -1,3 +1,4 @@
+from functools import partial
 from pathlib import Path
 
 import pandas as pd
@@ -40,17 +41,17 @@ def make_plot(
 
     # Secondary y won't show if there's nothing plotted on it
     fig = make_subplots(specs=[[{"secondary_y": True}]])
+    partial_scatter = partial(go.Scatter, line_width=line_width, connectgaps=True)
     if is_multi:
         is_secondary = False
         for col in ydata:
             fig.add_trace(
-                go.Scatter(x=xdata, y=ydata[col], name=col, line_width=line_width),
-                secondary_y=is_secondary,
+                partial_scatter(x=xdata, y=ydata[col], name=col), secondary_y=is_secondary
             )
             fig.update_yaxes(title_text=ylabel[col], secondary_y=is_secondary)
             is_secondary = True  # We can only have 2 columns so a simple flip is sufficient
     else:
-        fig.add_trace(go.Scatter(x=xdata, y=ydata, name=xdata.name, line_width=line_width))
+        fig.add_trace(partial_scatter(x=xdata, y=ydata, name=xdata.name))
         fig.update_yaxes(title_text=ylabel[ydata.name], secondary_y=False)
 
     # Set properties that don't vary by plot type
