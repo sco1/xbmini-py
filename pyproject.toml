@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "xbmini-py"
-version = "0.1.0"
+version = "0.2.0"
 description = "Python Toolkit for the GCDC HAM"
 authors = ["sco1 <sco1.git@gmail.com>"]
 
@@ -21,6 +21,10 @@ classifiers = [
     "Typing :: Typed",
 ]
 packages = [{include="xbmini"}]
+
+include = [
+    {path = "./CHANGELOG.md", format = "sdist"}
+]
 
 [tool.poetry.scripts]
 xbmini = "xbmini.cli:xbmini_cli"
