@@ -8,8 +8,6 @@
 
 Python Toolkit for the [GCDC HAM](http://www.gcdataconcepts.com/ham.html)
 
-🚨 This is a beta project. User-facing functionality is still under development 🚨
-
 ## Known Firmware Compatibility
 This package is currently tested against firmware versions `1379` and `2108`, compatibility with other firmware versions is not guaranteed.
 
@@ -26,10 +24,10 @@ import cog
 from subprocess import PIPE, run
 out = run(["xbmini", "--help"], stdout=PIPE, encoding="ascii")
 cog.out(
-    f"```bash\n$ xbmini --help\n{out.stdout.rstrip()}\n```"
+    f"```\n$ xbmini --help\n{out.stdout.rstrip()}\n```"
 )
 ]]] -->
-```bash
+```
 $ xbmini --help
                                                                                
  Usage: xbmini [OPTIONS] COMMAND [ARGS]...                                     
@@ -40,6 +38,7 @@ $ xbmini --help
 +- Commands ------------------------------------------------------------------+
 | batch-combine  Batch combine XBM files for each logger and dump a           |
 |                serialized `XBMLog` instance to CSV.                         |
+| dash           Dash UI launchers                                            |
 +-----------------------------------------------------------------------------+
 ```
 <!-- [[[end]]] -->
@@ -57,3 +56,33 @@ Batch combine XBM files for each logger and dump a serialized `XBMLog` instance 
 
 1. Log searching will be executed recursively starting from the top directory
 2. Case sensitivity is deferred to the host OS
+
+### `xbmini dash`
+A series of helper UIs are provided by [Dash](https://dash.plotly.com/). Running the CLI commands will start a local server for the user to interact with.
+
+**WARNING:** These apps are intended for use on a development server only. Do not use them in a production environment.
+
+A list of available UIs can be accessed via the command line:
+<!-- [[[cog
+import cog
+from subprocess import PIPE, run
+out = run(["xbmini", "dash", "--help"], stdout=PIPE, encoding="ascii")
+cog.out(
+    f"```\n$ xbmini dash --help\n{out.stdout.rstrip()}\n```"
+)
+]]] -->
+```
+$ xbmini dash --help
+                                                                               
+ Usage: xbmini dash [OPTIONS] COMMAND [ARGS]...                                
+                                                                               
+ Dash UI launchers                                                             
+                                                                               
++- Options -------------------------------------------------------------------+
+| --help          Show this message and exit.                                 |
++-----------------------------------------------------------------------------+
++- Commands ------------------------------------------------------------------+
+| trim     Helper UI for trimming serialized XBMLog CSVs.                     |
++-----------------------------------------------------------------------------+
+```
+<!-- [[[end]]] -->
