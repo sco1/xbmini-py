@@ -240,7 +240,7 @@ def extract_header(log_filepath: Path, header_prefix: str = ";") -> list[str]:
     # During self-test a fault may be detected, which prints e.g. "MPU Fault" as a non-comment line,
     # which aborts our heading extraction early
     if "Fault" in line:
-        raise ParserError(f"Sensor fault encountered: '{line}'")
+        raise ParserError(f"Sensor fault encountered: '{line.strip()}'")
 
     if not header_lines:
         raise ValueError("No header lines found. Is this a valid log file?")

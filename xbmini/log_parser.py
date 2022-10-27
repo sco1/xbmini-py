@@ -3,13 +3,15 @@ from __future__ import annotations
 import datetime as dt
 import io
 import json
+import os
 import typing as t
+from collections import abc
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 import pandas as pd
 
-from xbmini.heading_parser import HeaderInfo, extract_header, parse_header
+from xbmini.heading_parser import HeaderInfo, ParserError, extract_header, parse_header
 
 NUMERIC_T = int | float
 
@@ -27,6 +29,8 @@ PRESS_TEMP_COLS = ["pressure", "temperature", "press_alt_m", "press_alt_ft"]
 ROLLING_WINDOW_WIDTH = "200ms"
 
 DEFAULT_HEADER_PREFIX = ";"
+
+SKIP_STRINGS = ("processed", "trimmed", "combined")
 
 
 class HasSensitivity(t.Protocol):  # noqa: D101
@@ -336,3 +340,54 @@ class XBMLog:  # noqa: D101
         metadata["header_info"] = HeaderInfo.from_raw_dict(metadata["header_info"])
 
         return metadata
+
+
+def batch_combine(
+    top_dir: Path,
+    pattern: str = "*.CSV",
+    dry_run: bool = False,
+    skip_strs: abc.Collection[str] = SKIP_STRINGS,
+) -> None:
+    """
+    Batch combine raw XBM log files for each logger and dump a serialized `XBMLog` instance to CSV.
+
+    If a filename contains any of the substrings contained in `skip_strs` it will not be included in
+    the files to be combined.
+
+    If `dry_run` is specified, a listing of logger directories is printed and no CSV files will be
+    generated.
+
+    NOTE: All CSV files in a specific logger's directory are assumed to be from the same session &
+    are combined into a single file.
+
+    NOTE: Any pre-existing combined file in a given logger directory will be overwritten.
+    """
+    log_dirs = {log_file.parent for log_file in top_dir.rglob(pattern)}
+    print(f"Found {len(log_dirs)} logger(s) to combine.")
+
+    for log_dir in log_dirs:
+        snipped_dir = f"...{os.sep}{os.sep.join(str(log_dir).split(os.sep)[-4:])}"
+        out_filepath = log_dir / f"{log_dir.name}_processed.CSV"
+
+        # Filter files using the given skip_strs
+        files_to_combine = []
+        for file in log_dir.glob(pattern):
+            if not any(substr in file.name for substr in skip_strs):
+                files_to_combine.append(file)
+
+        if dry_run:
+            print(f"Would combine {len(files_to_combine)} log(s) from {snipped_dir}")
+            continue
+
+        print(
+            f"Combining {len(files_to_combine)} log(s) from {snipped_dir} ... ", end="", flush=True
+        )
+
+        try:
+            log = XBMLog.from_multi_raw_log(files_to_combine, normalize_time=True)
+            log.to_csv(out_filepath)
+        except ParserError as e:
+            print(f"{e}, skipping logger")
+            continue
+
+        print("Done!")
