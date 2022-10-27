@@ -1,3 +1,4 @@
+import typing as t
 from functools import partial
 from pathlib import Path
 
@@ -16,8 +17,7 @@ def make_plot(
     xlabel: str,
     ylabel: dict[str, str],
     line_width: int | float = 1.5,
-    width: int = 1440,
-    height: int = 900,
+    fig_size: t.Sequence[int] | None = (1440, 900),
     show_plot: bool = False,
 ) -> go.Figure:
     """
@@ -28,6 +28,9 @@ def make_plot(
 
     To plot on multiple y axes with respect to a common time index, provide `ydata` as a
     `pd.DataFrame` with multiple columns.
+
+    `fig_size` is expected to be provided as a sequence of int corresponding to the desired
+    (width, height) of the output figure. It may be set to `None` to auto-size.
 
     NOTE: A maximum of 2 y axes is currently supported.
     """
@@ -55,7 +58,20 @@ def make_plot(
         fig.update_yaxes(title_text=ylabel[ydata.name], secondary_y=False)
 
     # Set properties that don't vary by plot type
-    fig.update_layout(title_text=title, xaxis_title=xlabel, width=width, height=height)
+    width: int | None
+    height: int | None
+    if fig_size:
+        width, height, *_ = fig_size
+    else:
+        width = height = None
+
+    fig.update_layout(
+        title_text=title,
+        title_x=0.5,
+        xaxis_title=xlabel,
+        width=width,
+        height=height,
+    )
 
     if show_plot:
         fig.show()

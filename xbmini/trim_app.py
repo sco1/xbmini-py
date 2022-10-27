@@ -3,6 +3,7 @@ import datetime as dt
 import io
 import os
 
+import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.graph_objects as go
 from dash import Dash, dcc, exceptions, html, no_update
@@ -11,15 +12,14 @@ from dash.dependencies import Input, Output, State
 from xbmini.log_parser import XBMLog, _split_press_temp
 from xbmini.viz import make_plot
 
-app = Dash(__name__)
-app.layout = html.Div(
-    [
+app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+
+upload_panel = dbc.Card(
+    children=[
         dcc.Upload(
             id="upload-log-data",
             children=html.Div(["Drag and Drop or ", html.A("Select Processed CSV File")]),
             style={
-                "width": "75%",
-                "height": "60px",
                 "lineHeight": "60px",
                 "borderWidth": "1px",
                 "borderStyle": "dashed",
@@ -29,12 +29,35 @@ app.layout = html.Div(
             },
             multiple=False,
         ),
+    ],
+    body=True,
+)
+
+trim_panel = dbc.Card(
+    children=[
+        dbc.Button(id="trim-data-button", children="Trim Data"),
+        html.Div(id="trim-msg"),
+    ],
+    body=True,
+)
+
+app.layout = dbc.Container(
+    children=[
+        html.H1("XBM Triminator 9000"),
+        html.Hr(),
+        dbc.Row(
+            children=[dbc.Col(upload_panel)],
+            align="center",
+        ),
+        dbc.Row(
+            children=[dbc.Col(dcc.Graph(id="press-alt-plot"))],
+        ),
+        dbc.Row(
+            children=[dbc.Col(trim_panel)],
+        ),
         dcc.Store(id="log-data"),
         dcc.Store(id="log-metadata"),
-        dcc.Graph(id="press-alt-plot", style={"width": "75%"}),
-        html.Button(id="trim-data-button", children="Trim Data"),
         dcc.Download(id="dl-trimmed-log"),
-        html.Div(id="trim-msg"),
     ],
 )
 
@@ -78,7 +101,8 @@ def build_plot(log_data: str) -> go.Figure:  # noqa: D103
         ydata=log_df["press_alt_ft"],
         xlabel="Elased Time (s)",
         ylabel={"press_alt_ft": "Pressure Altitude (ft. AGL)"},
-        title="Sample Plot",
+        title="Pressure Altitude vs. Time",
+        fig_size=None,
     )
     return fig
 
