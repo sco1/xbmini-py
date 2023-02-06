@@ -8,11 +8,11 @@ jobs:
   build:
     name: Build dist & publish
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: '3.x'
 
@@ -21,7 +21,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install poetry
         poetry build
-      
+
     - name: Publish package
       uses: pypa/gh-action-pypi-publish@release/v1.5
       with:
