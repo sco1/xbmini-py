@@ -6,17 +6,25 @@ import json
 import os
 import typing as t
 from collections import abc
-from dataclasses import dataclass, field, fields
+from dataclasses import InitVar, dataclass, field, fields
 from pathlib import Path
 
 import pandas as pd
 
-from xbmini.heading_parser import HeaderInfo, ParserError, SensorInfo, extract_header, parse_header
+from xbmini.heading_parser import (
+    HeaderInfo,
+    LoggerType,
+    ParserError,
+    SensorInfo,
+    extract_header,
+    parse_header,
+)
 
 NUMERIC_T: t.TypeAlias = int | float
 
 MINIMUM_SUPPORTED_FIRMWARE = 2108
 
+# Group sensors that require conversions for easier iteration
 SENSOR_GROUPS = {
     "Accel": ["accel_x", "accel_y", "accel_z"],
     "Gyro": ["gyro_x", "gyro_y", "gyro_z"],
@@ -25,8 +33,10 @@ SENSOR_GROUPS = {
 }
 IMU_SENSORS = ("Accel", "Gyro", "Mag")
 
-# Pandas needs as a list for indexing
+# Group columns that we may want to look at separately
+# Pandas needs these as a list for indexing
 PRESS_TEMP_COLS = ["pressure", "temperature", "press_alt_m", "press_alt_ft"]
+GPS_COLS = ["latitude", "longitude", "height_ellipsoid", "height_msl", "hdop", "vdop"]
 
 ROLLING_WINDOW_WIDTH = "200ms"
 
@@ -78,7 +88,7 @@ def load_log(
         * Accelerometer, Gyroscope, and Magnetometer data is converted from raw counts to their
         respective units
         * Temperature is converted from mill-degree C to C
-        * Quaternions are converted from raw counts and normalized with RMS
+        * Quaternions, if present, are converted from raw counts and normalized with RMS
         * A `"total_accel"` column is calculated from the vector sum of the acceleration components
         * A `"total_accel_rolling"` column is calculated using a rolling mean of the `"total_accel"`
         values
@@ -133,26 +143,26 @@ def load_log(
     return full_data, header_info
 
 
-def _split_press_temp(
-    log_df: pd.DataFrame, columns: t.List[str] = PRESS_TEMP_COLS
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+def _split_cols(log_df: pd.DataFrame, columns: t.List[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Split off temperature & pressure columns since they sample at a lower rate.
+    Split off the specified column(s) into their own dataframe & drop from original.
 
     The columns are dropped from the incoming `DataFrame`, and the modified dataframe is returned.
     """
     # Only try to index & drop the columns that exist (e.g. press_alt_ft might not exist yet)
-    press_temp_df = log_df[log_df.columns.intersection(columns)].dropna(axis=0)
+    split_cols = log_df[log_df.columns.intersection(columns)].dropna(axis=0)
     log_df = log_df.drop(columns, axis=1, errors="ignore")
 
-    return press_temp_df, log_df
+    return split_cols, log_df
 
 
 @dataclass(slots=True)
 class XBMLog:  # noqa: D101
-    mpu: pd.DataFrame
-    press_temp: pd.DataFrame
     header_info: HeaderInfo
+    log_data: InitVar[pd.DataFrame]
+    mpu: pd.DataFrame = field(init=False)
+    press_temp: pd.DataFrame = field(init=False)
+    gps: pd.DataFrame | None = field(init=False)
     drop_date: dt.date | None = None
     drop_location: str | None = None
     drop_id: str | None = None
@@ -165,8 +175,10 @@ class XBMLog:  # noqa: D101
 
     _serialize_metadata_skip_fields: frozenset[str] = frozenset(
         (
+            # Split dataframes are skipped, we concatenate them back together before dumping
             "mpu",
             "press_temp",
+            "gps",
             "drop_date",
             "analysis_dt",
             "header_info",
@@ -174,7 +186,19 @@ class XBMLog:  # noqa: D101
         )
     )
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, log_data: pd.DataFrame) -> None:
+        # Split out pressure/temperature data & GPS, if available
+        press_temp, mpu_data = _split_cols(log_data, columns=PRESS_TEMP_COLS)
+        self.press_temp = press_temp
+
+        if self.header_info.logger_type is LoggerType.IMU_GPS:
+            gps_data, mpu_data = _split_cols(mpu_data, columns=GPS_COLS)
+            self.gps = gps_data
+        else:
+            self.gps = None
+
+        self.mpu = mpu_data
+
         # Calculate pressure altitude using the specified ground level pressure
         self._calculate_pressure_altitude()
 
@@ -312,12 +336,9 @@ class XBMLog:  # noqa: D101
         if normalize_time:
             full_data.index = full_data.index - full_data.index[0]
 
-        press_temp, mpu_data = _split_press_temp(full_data)
-
         return cls(
-            mpu=mpu_data,
-            press_temp=press_temp,
             header_info=header_info,
+            log_data=full_data,
             _is_merged=True,
         )
 
@@ -343,9 +364,8 @@ class XBMLog:  # noqa: D101
 
         full_data.index = pd.TimedeltaIndex(full_data.index)
         metadata = cls._deserialize_metadata(metadata_header)
-        press_temp, mpu = _split_press_temp(full_data)
 
-        return cls(mpu=mpu, press_temp=press_temp, **metadata)
+        return cls(log_data=full_data, **metadata)
 
     @staticmethod
     def _deserialize_metadata(in_json: str) -> dict:
