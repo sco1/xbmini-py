@@ -46,8 +46,8 @@ def log_file_data(tmp_log: Path) -> LOG_FILE_DATA_T:
 def test_press_alt_conversion(log_file_data: LOG_FILE_DATA_T) -> None:
     log_obj = XBMLog(*log_file_data)
 
-    assert log_obj.press_temp["press_alt_ft"][0] == pytest.approx(811.67, abs=1e-2)
-    assert log_obj.press_temp["press_alt_m"][0] == pytest.approx(247.40, abs=1e-2)
+    assert log_obj.press_temp["press_alt_ft"].iloc[0] == pytest.approx(811.67, abs=1e-2)
+    assert log_obj.press_temp["press_alt_m"].iloc[0] == pytest.approx(247.40, abs=1e-2)
 
 
 def test_press_alt_update(log_file_data: LOG_FILE_DATA_T) -> None:
@@ -55,5 +55,5 @@ def test_press_alt_update(log_file_data: LOG_FILE_DATA_T) -> None:
     log_obj.ground_pressure = 100_000
 
     assert log_obj.ground_pressure == 100_000
-    assert log_obj.press_temp["press_alt_ft"][0] == pytest.approx(446.86, abs=1e-2)
-    assert log_obj.press_temp["press_alt_m"][0] == pytest.approx(136.20, abs=1e-2)
+    assert log_obj.press_temp["press_alt_ft"].iloc[0] == pytest.approx(446.86, abs=1e-2)
+    assert log_obj.press_temp["press_alt_m"].iloc[0] == pytest.approx(136.20, abs=1e-2)

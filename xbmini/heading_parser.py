@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import asdict, dataclass, fields
+from collections import abc
+from dataclasses import asdict, dataclass, field, fields
 from enum import Enum
 from pathlib import Path
 
@@ -26,20 +27,15 @@ HEADER_MAP = {
 }
 
 VER_SN_RE = re.compile(r"Version,\s+(\d+)[\w\s,]+SN:(\w+)")
-KNOWN_LEGACY_HEADER_FIRMWARE = {1379}
-EXPECTED_SENSOR_NAMES = {"Accel", "Gyro", "Mag"}
 
 
 class ParserError(RuntimeError):  # noqa: D101
     ...
 
 
-class SensorParseError(ParserError):  # noqa: D101
-    ...
-
-
 class LoggerType(Enum):  # noqa: D101
     HAM_IMU_ALT = "HAM-IMU+alt"
+    IMU_GPS = "GPS"
 
 
 @dataclass
@@ -49,85 +45,6 @@ class SensorInfo:  # noqa: D101
     sensitivity: int
     full_scale: int
     units: str
-
-    @classmethod
-    def from_header_line(cls, header_line: str) -> SensorInfo:
-        """
-        Parse sensor configuration from the provided header line.
-
-        Sensor headers are assumed to be of the form:
-            <name, sample rate, counts per unit, full scale value, units>
-
-        e.g. `"Accel, 225, 1000, 16, g"`
-        """
-        split_line = [chunk.strip() for chunk in header_line.split(",")]
-        name = split_line[0]
-        sample_rate = int(split_line[1])
-        sensitivity = int(split_line[2])
-        full_scale = int(split_line[3])
-        units = split_line[4]
-
-        return cls(
-            name=name,
-            sample_rate=sample_rate,
-            sensitivity=sensitivity,
-            full_scale=full_scale,
-            units=units,
-        )
-
-    @classmethod
-    def from_legacy_header(cls, header_line: str) -> dict[str, SensorInfo]:
-        """
-        Parse sensor configuration from the provided legacy sensor header line format.
-
-        Expected like: `MPU SR, 200,Hz,  Accel sens, 2048,counts/g, Gyro sens, 16,counts/dps,\
-        Mag SR, 10,Hz,  Mag sens, 1666,counts/mT`
-        """
-        # In the legacy header, Accel and Gyro share a single sample rate declaration and separate
-        # sensitivities
-        sensor_info = {}
-        raw_mpu_sample_rate = re.search(r"MPU SR,\s+(\d+)", header_line)
-        if not raw_mpu_sample_rate:
-            raise SensorParseError("Could not locate MPU sample rate.")
-
-        mpu_sample_rate = int(raw_mpu_sample_rate.group(1))
-
-        for sensor in ("Accel", "Gyro"):
-            check_match = re.search(rf"{sensor} sens,\s+(\d+),([\w/]+)", header_line)
-            if not check_match:
-                raise SensorParseError(f"Could not locate '{sensor}' sensitivity and/or units.")
-
-            raw_counts, raw_units = check_match.groups()
-            sensitivity = int(raw_counts)
-            units = raw_units.split("/")[-1]
-
-            sensor_info[sensor] = cls(
-                name=sensor,
-                sample_rate=mpu_sample_rate,
-                sensitivity=sensitivity,
-                full_scale=-1,  # This needs to be mapped from the sensitivity, check the docs
-                units=units,
-            )
-
-        # Magnetometer comes in the final chunk
-        check_mag = re.search(r"Mag SR,\s+(\d+),Hz,\s+Mag sens,\s+(\d+),([\w/]+)", header_line)
-        if not check_mag:
-            raise SensorParseError("Could not locate magnetometer sensor specification.")
-
-        raw_mag_sample_rate, raw_counts, raw_units = check_mag.groups()
-        mag_sample_rate = int(raw_mag_sample_rate)
-        sensitivity = int(raw_counts)
-        units = raw_units.split("/")[-1]
-
-        sensor_info["Mag"] = cls(
-            name="Mag",
-            sample_rate=mag_sample_rate,
-            sensitivity=sensitivity,
-            full_scale=-1,  # This needs to be mapped from the sensitivity, check the docs
-            units=units,
-        )
-
-        return sensor_info
 
     def to_dict(self) -> dict[str, int | str]:
         """Dump the instance into a dictionary."""
@@ -151,8 +68,8 @@ class HeaderInfo:  # noqa: D101
     logger_type: LoggerType
     firmware_version: int
     serial: str
-    sensors: dict[str, SensorInfo]
     header_spec: list[str]
+    sensors: dict[str, SensorInfo] = field(default_factory=dict)
 
     _custom_serialize: frozenset[str] = frozenset(("logger_type", "sensors", "_custom_serialize"))
 
@@ -248,24 +165,9 @@ def extract_header(log_filepath: Path, header_prefix: str = ";") -> list[str]:
     return header_lines
 
 
-def _parse_sensor_info(sensor_lines: list[str], firmware_ver: int) -> dict[str, SensorInfo]:
-    sensor_info = {}
-    if firmware_ver in KNOWN_LEGACY_HEADER_FIRMWARE:
-        # All sensor information for this firmware version(s) is in one header line
-        sensor_info.update(SensorInfo.from_legacy_header(sensor_lines[0]))
-    else:
-        # Sensor header line isn't useful in newer firmware versions
-        for line in sensor_lines[1:]:
-            spec = SensorInfo.from_header_line(line)
-            sensor_info[spec.name] = spec
-
-    return sensor_info
-
-
-def parse_header(header_lines: list[str]) -> HeaderInfo:
+def parse_header(header_lines: abc.Sequence[str]) -> HeaderInfo:
     """Parse log file information from the provided header lines."""
     firmware_version = -1
-    sensor_lines = []
     for line in header_lines:
         if line.startswith("Title"):
             # Expected like "Title, http://www.gcdataconcepts.com, HAM-IMU+alt, MPU9250 BMP280"
@@ -283,28 +185,6 @@ def parse_header(header_lines: list[str]) -> HeaderInfo:
 
             continue
 
-        # Sensor information presentation differs by firmware version, so we'll pull them out and
-        # parse after they're all gathered
-        # This will include the "MPU" line, which is useful for legacy and useless otherwise
-        if line.startswith("MPU"):
-            sensor_lines.append(line)
-
-        if any(line.startswith(sensor_name) for sensor_name in EXPECTED_SENSOR_NAMES):
-            sensor_lines.append(line)
-            continue
-
-    # If we didn't find all of the expected sensors then we should abort here to prevent issues
-    # issues downstream
-    sensor_info = _parse_sensor_info(sensor_lines, firmware_version)
-    if not sensor_info:
-        raise SensorParseError("Unable to locate any sensor configuration header lines.")
-
-    key_diff = EXPECTED_SENSOR_NAMES - sensor_info.keys()
-    if key_diff:
-        raise SensorParseError(
-            f"Unable to locate all expected sensor names. Missing: {', '.join(key_diff)}"
-        )
-
     # Column headers should be the last line, convert these to more readable names
     header_spec = _map_headers(header_lines[-1])
 
@@ -314,7 +194,6 @@ def parse_header(header_lines: list[str]) -> HeaderInfo:
             logger_type=logger_type,
             firmware_version=firmware_version,
             serial=device_serial,
-            sensors=sensor_info,
             header_spec=header_spec,
         )
     except NameError as e:

@@ -9,7 +9,7 @@
 Python Toolkit for the [GCDC HAM](http://www.gcdataconcepts.com/ham.html)
 
 ## Known Firmware Compatibility
-This package is currently tested against firmware versions `1379` and `2108`, compatibility with other firmware versions is not guaranteed.
+This package is currently tested against firmware versions `1379`, `2108`, and `2570`, compatibility with other firmware versions is not guaranteed.
 
 ## Installation
 Install from PyPi with your favorite `pip` invocation:
