@@ -11,9 +11,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from xbmini.heading_parser import HeaderInfo, ParserError, extract_header, parse_header
+from xbmini.heading_parser import HeaderInfo, ParserError, SensorInfo, extract_header, parse_header
 
-NUMERIC_T = int | float
+NUMERIC_T: t.TypeAlias = int | float
+
+MINIMUM_SUPPORTED_FIRMWARE = 2108
 
 SENSOR_GROUPS = {
     "Accel": ["accel_x", "accel_y", "accel_z"],
@@ -31,6 +33,31 @@ ROLLING_WINDOW_WIDTH = "200ms"
 DEFAULT_HEADER_PREFIX = ";"
 
 SKIP_STRINGS = ("processed", "trimmed", "combined")
+
+# Until we re-implement sensor parsing, explicitly set the sensor information
+DEFAULT_SENS_OVERRIDE = {
+    "Accel": SensorInfo(
+        name="Accel",
+        sample_rate=200,
+        sensitivity=2048,
+        full_scale=-1,
+        units="g",
+    ),
+    "Gyro": SensorInfo(
+        name="Gyro",
+        sample_rate=200,
+        sensitivity=16,
+        full_scale=-1,
+        units="dps",
+    ),
+    "Mag": SensorInfo(
+        name="Mag",
+        sample_rate=10,
+        sensitivity=1666,
+        full_scale=-1,
+        units="mT",
+    ),
+}
 
 
 class HasSensitivity(t.Protocol):  # noqa: D101
@@ -80,7 +107,7 @@ def load_log(
     if sensitivity_override:
         sensor_info = sensitivity_override
     else:
-        sensor_info = header_info.sensors
+        sensor_info = DEFAULT_SENS_OVERRIDE  # Use default until sensor parsing is re-implemented
 
     for sensor in IMU_SENSORS:
         for column in sensor_groups[sensor]:
