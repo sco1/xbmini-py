@@ -30,6 +30,46 @@ def test_header_parse() -> None:
     assert parse_header(SAMPLE_HEADER) == TRUTH_HEADER_INFO
 
 
+SAMPLE_GPS_HEADER = [
+    "Title, http://www.gcdataconcepts.com, LSM6DSM, BMP384, GPS",
+    "Version, 2570, Build date, Jan  1 2022,  SN:ABC122345F0420",
+    "Start_time, 2022-09-26, 08:13:29.030",
+    "Uptime, 6,sec,  Vbat, 4198, mv, EOL, 3500, mv",
+    "Deadband, 0, counts",
+    "DeadbandTimeout, 0.000,sec",
+    "BMP384, SI, 0.100,sec, Units, Pa, mdegC",
+    "Alt Trigger disabled",
+    "LSM6DSM, SR,104,Hz, Units, mG, mdps, fullscale gyro 250dps, accel 4g",
+    "Magnetometer, SR,10,Hz, Units, nT, Temperature, 19,degC",
+    "CAM_M8 Gps, SR,1,Hz",
+    "Gps Sats, TOW, 123456789, ver, 1, numSat, 13",
+    ", gnssId, svId, cno, elev, azmith, prRes, flags,inUse",
+    ", GPS , 001, 26, 23, 219, 0, 0x00001213",
+    "Time, P, T",
+]
+
+TRUTH_GPS_HEADER_INFO = HeaderInfo(
+    n_header_lines=15,
+    logger_type=LoggerType.IMU_GPS,
+    firmware_version=2570,
+    serial="ABC122345F0420",
+    header_spec=["time", "pressure", "temperature"],
+)
+
+
+def test_gps_header_parse() -> None:
+    assert parse_header(SAMPLE_GPS_HEADER) == TRUTH_GPS_HEADER_INFO
+
+
+SAMPLE_HEADER_BAD_VERSION = ["Version, beta, 2108, Build date, Jan  1 2022,  SN:ABC122345F0420"]
+
+
+def test_bad_ver_raises() -> None:
+    with pytest.raises(ParserError, match=r"Version"):
+        parse_header(SAMPLE_HEADER_BAD_VERSION)
+
+
+# Doesn't have logger type (title line)
 SAMPLE_HEADER_MISSING_INFO = [
     "Version, 2108, Build date, Jan  1 2022,  SN:ABC122345F0420",
     "MPU, SR (Hz), Sens (counts/unit), FullScale (units), Units",
@@ -41,5 +81,5 @@ SAMPLE_HEADER_MISSING_INFO = [
 
 
 def test_missing_info_raises() -> None:
-    with pytest.raises(ParserError):
+    with pytest.raises(ParserError, match=r"logger_type"):
         parse_header(SAMPLE_HEADER_MISSING_INFO)

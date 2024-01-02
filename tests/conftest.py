@@ -51,3 +51,37 @@ def tmp_multi_log(tmp_path: Path) -> list[Path]:
     tmp_log_2.write_text(SAMPLE_LOG_FILE_2)
 
     return [tmp_log_1, tmp_log_2]
+
+
+SAMPLE_GPS_LOG = """\
+;Title, http://www.gcdataconcepts.com, LSM6DSM, BMP384, GPS
+;Version, 2570, Build date, Jan  1 2022,  SN:ABC122345F0420
+;Start_time, 2022-09-26, 08:13:29.030
+;Uptime, 6,sec,  Vbat, 4198, mv, EOL, 3500, mv
+;Deadband, 0, counts
+;DeadbandTimeout, 0.000,sec
+;BMP384, SI, 0.100,sec, Units, Pa, mdegC
+;Alt Trigger disabled
+;LSM6DSM, SR,104,Hz, Units, mG, mdps, fullscale gyro 250dps, accel 4g
+;Magnetometer, SR,10,Hz, Units, nT, Temperature, 19,degC
+;CAM_M8 Gps, SR,1,Hz
+;Gps Sats, TOW, 123456789, ver, 1, numSat, 13
+;, gnssId, svId, cno, elev, azmith, prRes, flags,inUse
+;, GPS , 001, 26, 23, 219, 0, 0x00001213
+;, GPS , 002, 33, 65, 318, 0, 0x00001213
+;, GPS , 003, 00, 35, 298, 0, 0x00001211
+;, GPS , 004, 00, 04, 283, 0, 0x00001211
+;, GPS , 005, 00, 29, 151, 0, 0x00001211
+;, GPS , 006, 00, 20, 210, 0, 0x00001911
+;, GPS , 007, 00, 46, 121, 0, 0x00001911
+;, GPS , 008, 00, 35, 043, 0, 0x00001211
+;Time, Ax, Ay, Az, Gx, Gy, Gz, Mx, My, Mz, P, T, TOW, Lat,Lon, Height(m), MSL(m), hdop(m), vdop(m)
+0.01,1121,-15,24,-1,2,0,-0.039,7349,-68100,47099,98405,22431, 312086.000, 32.8798677,-111.7583495, 429.658,457.958, 165173.568,116795.352
+"""
+
+
+@pytest.fixture
+def tmp_log_gps(tmp_path: Path) -> Path:
+    tmp_log = tmp_path / "log.CSV"
+    tmp_log.write_text(SAMPLE_GPS_LOG)
+    return tmp_log

@@ -24,6 +24,12 @@ HEADER_MAP = {
     "Mz": "mag_z",
     "P": "pressure",
     "T": "temperature",
+    "Lat": "latitude",
+    "Lon": "longitude",
+    "Height(m)": "height_ellipsoid",
+    "MSL(m)": "height_msl",
+    "hdop(m)": "hdop",
+    "vdop(m)": "vdop",
 }
 
 VER_SN_RE = re.compile(r"Version,\s+(\d+)[\w\s,]+SN:(\w+)")
@@ -170,10 +176,15 @@ def parse_header(header_lines: abc.Sequence[str]) -> HeaderInfo:
     firmware_version = -1
     for line in header_lines:
         if line.startswith("Title"):
-            # Expected like "Title, http://www.gcdataconcepts.com, HAM-IMU+alt, MPU9250 BMP280"
-            split_line = [chunk.strip() for chunk in line.split(",")]
-            logger_type = LoggerType(split_line[2])
-            continue
+            if "GPS" in line:
+                # IMU-GPS currently does not have a device name in the title line, but has sensors
+                logger_type = LoggerType.IMU_GPS
+                continue
+            else:
+                # Expected like "Title, http://www.gcdataconcepts.com, HAM-IMU+alt, MPU9250 BMP280"
+                split_line = [chunk.strip() for chunk in line.split(",")]
+                logger_type = LoggerType(split_line[2])
+                continue
 
         if line.startswith("Version"):
             try_match = VER_SN_RE.match(line)

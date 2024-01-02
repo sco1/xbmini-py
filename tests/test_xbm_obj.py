@@ -1,13 +1,12 @@
 import datetime as dt
+import typing as t
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
 from xbmini.heading_parser import HeaderInfo
-from xbmini.log_parser import XBMLog, _split_press_temp, load_log
-
-LOG_FILE_DATA_T = tuple[pd.DataFrame, pd.DataFrame, HeaderInfo]
+from xbmini.log_parser import XBMLog, load_log
 
 
 # I don't think we need to test much for these two constructors beyond their flags, since they're
@@ -35,12 +34,14 @@ def test_xbm_from_multi_normalized_timestamp(tmp_multi_log: list[Path]) -> None:
     assert log_obj._is_merged is True
 
 
+LOG_FILE_DATA_T: t.TypeAlias = tuple[HeaderInfo, pd.DataFrame]
+
+
 @pytest.fixture
 def log_file_data(tmp_log: Path) -> LOG_FILE_DATA_T:
     full_data, header_info = load_log(tmp_log)
-    press_temp, mpu = _split_press_temp(full_data)
 
-    return mpu, press_temp, header_info
+    return header_info, full_data
 
 
 def test_press_alt_conversion(log_file_data: LOG_FILE_DATA_T) -> None:

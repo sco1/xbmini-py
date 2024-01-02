@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from xbmini.heading_parser import SensorInfo
-from xbmini.log_parser import _split_press_temp, load_log
+from xbmini.log_parser import PRESS_TEMP_COLS, _split_cols, load_log
 
 TRUTH_DF = pd.DataFrame(
     {
@@ -115,6 +115,6 @@ TRUTH_PRESS_TEMP_SPLIT = pd.DataFrame(
 
 
 def test_split_press_temp() -> None:
-    press_temp, mpu = _split_press_temp(TRUTH_DF_MULTILINE)
+    press_temp, mpu = _split_cols(TRUTH_DF_MULTILINE, columns=PRESS_TEMP_COLS)
     pd.testing.assert_frame_equal(press_temp, TRUTH_PRESS_TEMP_SPLIT, check_exact=False)
     pd.testing.assert_frame_equal(mpu, TRUTH_MPU_SPLIT, check_exact=False)

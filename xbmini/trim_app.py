@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 from dash import Dash, dcc, exceptions, html, no_update
 from dash.dependencies import Input, Output, State
 
-from xbmini.log_parser import XBMLog, _split_press_temp
+from xbmini.log_parser import XBMLog
 from xbmini.viz import make_plot
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -137,8 +137,7 @@ def trim_plot_data(
     trimmed_df = log_df.loc[(log_df.index >= window[0]) & (log_df.index <= window[1])]
 
     metadata = XBMLog._deserialize_metadata(log_metadata)
-    press_temp, mpu = _split_press_temp(trimmed_df)
-    log = XBMLog(mpu, press_temp, **metadata)
+    log = XBMLog(log_data=trimmed_df, **metadata)
     log._is_merged = True
 
     name, ext = os.path.splitext(in_filename)
