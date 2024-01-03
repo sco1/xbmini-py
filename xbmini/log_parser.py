@@ -36,7 +36,16 @@ IMU_SENSORS = ("Accel", "Gyro", "Mag")
 # Group columns that we may want to look at separately
 # Pandas needs these as a list for indexing
 PRESS_TEMP_COLS = ["pressure", "temperature", "press_alt_m", "press_alt_ft"]
-GPS_COLS = ["latitude", "longitude", "height_ellipsoid", "height_msl", "hdop", "vdop"]
+GPS_COLS = [
+    "time_of_week",
+    "latitude",
+    "longitude",
+    "height_ellipsoid",
+    "height_msl",
+    "hdop",
+    "vdop",
+    "utc_timestamp",
+]
 
 ROLLING_WINDOW_WIDTH = "200ms"
 
@@ -85,6 +94,8 @@ def load_log(
 
     Once the raw data is loaded, the following transformations and derivations are performed:
         * Time values are converted to a `pandas.TimedeltaIndex` and used as the `DataFrame` index
+            * For IMU-GPS devices, this time value should usually be a valid UTC timestamp & is
+            copied to a separate `"utc_timestamp"` column & converted to a datetime
         * Accelerometer, Gyroscope, and Magnetometer data is converted from raw counts to their
         respective units
         * Temperature is converted from mill-degree C to C
@@ -110,6 +121,11 @@ def load_log(
         index_col="time",
         comment=";",
     )
+
+    # For IMU-GPS, preserve UTC timestamp as a datetime instance
+    if header_info.logger_type is LoggerType.IMU_GPS:
+        full_data["utc_timestamp"] = pd.to_datetime(full_data.index, unit="s", utc=True)
+
     # Convert time index to timedelta so we can use rolling time windows later
     full_data.index = pd.TimedeltaIndex(full_data.index, unit="S")
 
@@ -133,12 +149,14 @@ def load_log(
     full_data["temperature"] = full_data["temperature"] / 1000
 
     # Convert quaternion data, incoming as 16bit values, then normalize with RMS
-    quat_cols = sensor_groups["Quat"]
-    full_data[quat_cols] = full_data[quat_cols] / 65536
-    q_rms = full_data[quat_cols].pow(2).sum(axis=1).pow(1 / 2)
-    for col in quat_cols:
-        # Not sure what the magic pandas invocation is do do this without a loop
-        full_data[col] = full_data[col] / q_rms
+    # IMU-GPS devices do not log quaternions
+    if header_info.logger_type is not LoggerType.IMU_GPS:
+        quat_cols = sensor_groups["Quat"]
+        full_data[quat_cols] = full_data[quat_cols] / 65536
+        q_rms = full_data[quat_cols].pow(2).sum(axis=1).pow(1 / 2)
+        for col in quat_cols:
+            # Not sure what the magic pandas invocation is do do this without a loop
+            full_data[col] = full_data[col] / q_rms
 
     return full_data, header_info
 
@@ -222,6 +240,10 @@ class XBMLog:  # noqa: D101
         self._ground_pressure = pressure
         self._calculate_pressure_altitude()
 
+    @property
+    def _full_dataframe(self) -> pd.DataFrame:
+        return pd.concat((self.mpu, self.press_temp, self.gps), axis=1)
+
     def _serialize_metadata(self) -> str:
         """Dump the instance into a serializable dictionary."""
         # Rather than some complicated instance matching logic, just dump what's serializable first
@@ -244,8 +266,8 @@ class XBMLog:  # noqa: D101
         Dump the current class instance into the provided CSV filepath.
 
         Logger metadata is serialized into JSON and inserted as a single line at the top of the
-        file using the provided `header_prefix`. The MPU and Pressure/Temperature dataframes are
-        horizontally concatenated and dumped by Pandas as CSV.
+        file using the provided `header_prefix`. The MPU, pressure/temperature, and GPS dataframes
+        are horizontally concatenated and dumped by Pandas as CSV.
         """
         out_filepath.write_text(self._to_string(header_prefix))
 
@@ -254,10 +276,10 @@ class XBMLog:  # noqa: D101
         Dump the current class instance to a string.
 
         Logger metadata is serialized into JSON and inserted as a single line at the beginning of
-        the string using the provided `header_prefix`. The MPU and Pressure/Temperature dataframes
-        are horizontally concatenated and dumped by Pandas as CSV.
+        the string using the provided `header_prefix`. The MPU, pressure/temperature, and GPS
+        dataframes are horizontally concatenated and dumped by Pandas as CSV.
         """
-        full_data = pd.concat((self.mpu, self.press_temp), axis=1)
+        full_data = self._full_dataframe
         buff = io.StringIO(newline="")
         buff.write(f"{header_prefix}{self._serialize_metadata()}\n")
         full_data.to_csv(buff)
@@ -356,11 +378,9 @@ class XBMLog:  # noqa: D101
             with in_log.open("r") as f:
                 metadata_header = f.readline().lstrip(header_prefix).strip()
                 full_data = pd.read_csv(f, index_col=0)
-        elif isinstance(in_log, io.StringIO):
+        elif isinstance(in_log, io.StringIO):  # pragma: no branch
             metadata_header = in_log.readline().lstrip(header_prefix).strip()
             full_data = pd.read_csv(in_log, index_col=0)
-        else:
-            raise ValueError(f"Unsupported input type specified: {type(in_log)}")
 
         full_data.index = pd.TimedeltaIndex(full_data.index)
         metadata = cls._deserialize_metadata(metadata_header)
