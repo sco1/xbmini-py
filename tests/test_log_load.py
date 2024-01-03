@@ -36,6 +36,39 @@ def test_log_loader(tmp_log: Path) -> None:
     pd.testing.assert_frame_equal(df, TRUTH_DF, check_exact=False)
 
 
+TRUTH_DF_GPS = pd.DataFrame(
+    {
+        "time": [dt.timedelta(seconds=9433200)],
+        "accel_x": [0.048828],
+        "accel_y": [0.048828],
+        "accel_z": [0.048828],
+        "gyro_x": [12.5],
+        "gyro_y": [12.5],
+        "gyro_z": [12.5],
+        "mag_x": [0.180072],
+        "mag_y": [0.180072],
+        "mag_z": [0.180072],
+        "pressure": [100000],  # With a single data row (no NaNs), this will be an int
+        "temperature": [20.0],
+        "time_of_week": [300000.6],
+        "latitude": [33.6571],
+        "longitude": [-117.7462],
+        "height_ellipsoid": [429.0],
+        "height_msl": [457.0],
+        "hdop": [1.0],
+        "vdop": [2.0],
+        "utc_timestamp": [dt.datetime.fromtimestamp(9433200, tz=dt.timezone.utc)],
+        "total_accel": [0.084573],
+        "total_accel_rolling": [0.084573],
+    }
+).set_index("time")
+
+
+def test_gps_log_loader(tmp_log_gps: Path) -> None:
+    df, _ = load_log(tmp_log_gps)
+    pd.testing.assert_frame_equal(df, TRUTH_DF_GPS, check_exact=False)
+
+
 SENS_OVERRIDE = {
     "Accel": SensorInfo(
         name="Accel",

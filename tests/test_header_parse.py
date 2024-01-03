@@ -65,7 +65,7 @@ SAMPLE_HEADER_BAD_VERSION = ["Version, beta, 2108, Build date, Jan  1 2022,  SN:
 
 
 def test_bad_ver_raises() -> None:
-    with pytest.raises(ParserError, match=r"Version"):
+    with pytest.raises(ParserError, match="Version"):
         parse_header(SAMPLE_HEADER_BAD_VERSION)
 
 
@@ -81,5 +81,5 @@ SAMPLE_HEADER_MISSING_INFO = [
 
 
 def test_missing_info_raises() -> None:
-    with pytest.raises(ParserError, match=r"logger_type"):
+    with pytest.raises(ParserError, match="logger_type"):
         parse_header(SAMPLE_HEADER_MISSING_INFO)

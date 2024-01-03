@@ -6,14 +6,25 @@ import pandas as pd
 import pytest
 
 from xbmini.heading_parser import HeaderInfo
-from xbmini.log_parser import XBMLog, load_log
+from xbmini.log_parser import GPS_COLS, PRESS_TEMP_COLS, XBMLog, load_log
 
 
-# I don't think we need to test much for these two constructors beyond their flags, since they're
-# just stuffing dataframes into attributes & we're already testing their parsing elsewhere
 def test_xbm_from_log(tmp_log: Path) -> None:
     log_obj = XBMLog.from_raw_log_file(tmp_log)
     assert log_obj._is_merged is False
+
+
+def test_press_temp_split(tmp_log: Path) -> None:
+    log_obj = XBMLog.from_raw_log_file(tmp_log)
+    assert not (set(log_obj.mpu.columns.values) & set(PRESS_TEMP_COLS))
+    assert set(log_obj.press_temp.columns.values) == set(PRESS_TEMP_COLS)
+
+
+def test_gps_data_split(tmp_log_gps: Path) -> None:
+    log_obj = XBMLog.from_raw_log_file(tmp_log_gps)
+    assert log_obj.gps is not None
+    assert not (set(log_obj.mpu.columns.values) & set(GPS_COLS))
+    assert set(log_obj.gps.columns.values) == set(GPS_COLS)
 
 
 def test_xbm_from_multi(tmp_multi_log: list[Path]) -> None:

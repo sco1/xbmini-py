@@ -24,6 +24,7 @@ HEADER_MAP = {
     "Mz": "mag_z",
     "P": "pressure",
     "T": "temperature",
+    "TOW": "time_of_week",
     "Lat": "latitude",
     "Lon": "longitude",
     "Height(m)": "height_ellipsoid",
