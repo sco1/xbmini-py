@@ -4,29 +4,29 @@ from pathlib import Path
 
 import pandas as pd
 
-from xbmini.heading_parser import SensorInfo
+from xbmini.heading_parser import SensorInfo, SensorSpec
 from xbmini.log_parser import PRESS_TEMP_COLS, _split_cols, load_log
 
 TRUTH_DF = pd.DataFrame(
     {
         "time": [dt.timedelta(seconds=0.01)],
-        "accel_x": [0.547363],
-        "accel_y": [-0.0073242],
-        "accel_z": [0.0117187],
-        "gyro_x": [-0.062500],
-        "gyro_y": [0.125],
+        "accel_x": [1.121],
+        "accel_y": [-0.015],
+        "accel_z": [0.024],
+        "gyro_x": [-1.0],
+        "gyro_y": [2.0],
         "gyro_z": [0.0],
         "quat_w": [0.782693],
-        "quat_x": [-0.028025],
+        "quat_x": [-0.0280248],
         "quat_y": [-0.620550],
         "quat_z": [-0.0390345],
-        "mag_x": [4.411164],
-        "mag_y": [-40.876351],
-        "mag_z": [28.270708],
+        "mag_x": [7349.0],
+        "mag_y": [-68100.0],
+        "mag_z": [47099.0],
         "pressure": [98405],  # With a single data row (no NaNs), this will be an int
         "temperature": [22.431],
-        "total_accel": [0.547538],
-        "total_accel_rolling": [0.547538],
+        "total_accel": [1.121357],
+        "total_accel_rolling": [1.121357],
     }
 ).set_index("time")
 
@@ -69,25 +69,25 @@ def test_gps_log_loader(tmp_log_gps: Path) -> None:
     pd.testing.assert_frame_equal(df, TRUTH_DF_GPS, check_exact=False)
 
 
-SENS_OVERRIDE = {
+SENS_OVERRIDE: SensorSpec = {
     "Accel": SensorInfo(
         name="Accel",
         sample_rate=225,
-        sensitivity=1000,
+        sensitivity=10,
         full_scale=-1,
         units="g",
     ),
     "Gyro": SensorInfo(
         name="Gyro",
         sample_rate=225,
-        sensitivity=1,
+        sensitivity=10,
         full_scale=-1,
         units="dps",
     ),
     "Mag": SensorInfo(
         name="Mag",
         sample_rate=75,
-        sensitivity=1,
+        sensitivity=10,
         full_scale=-1,
         units="mT",
     ),
@@ -96,23 +96,23 @@ SENS_OVERRIDE = {
 TRUTH_DF_SENS_OVERRIDE = pd.DataFrame(
     {
         "time": [dt.timedelta(seconds=0.01)],
-        "accel_x": [1.121],
-        "accel_y": [-0.015],
-        "accel_z": [0.024],
-        "gyro_x": [-1.0],
-        "gyro_y": [2.0],
+        "accel_x": [112.1],
+        "accel_y": [-001.5],
+        "accel_z": [2.4],
+        "gyro_x": [-0.10],
+        "gyro_y": [0.20],
         "gyro_z": [0.0],
         "quat_w": [0.782693],
         "quat_x": [-0.0280248],
         "quat_y": [-0.620550],
         "quat_z": [-0.0390345],
-        "mag_x": [7349.0],
-        "mag_y": [-68100.0],
-        "mag_z": [47099.0],
+        "mag_x": [734.90],
+        "mag_y": [-6810.0],
+        "mag_z": [4709.9],
         "pressure": [98405],  # With a single data row (no NaNs), this will be an int
         "temperature": [22.431],
-        "total_accel": [1.121357],
-        "total_accel_rolling": [1.121357],
+        "total_accel": [112.1357],
+        "total_accel_rolling": [112.1357],
     }
 ).set_index("time")
 

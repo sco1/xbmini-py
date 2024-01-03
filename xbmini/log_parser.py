@@ -17,6 +17,7 @@ from xbmini.heading_parser import (
     LoggerType,
     ParserError,
     SensorInfo,
+    SensorSpec,
     extract_header,
     parse_header,
 )
@@ -32,7 +33,6 @@ SENSOR_GROUPS = {
     "Mag": ["mag_x", "mag_y", "mag_z"],
     "Quat": ["quat_x", "quat_y", "quat_z", "quat_w"],
 }
-IMU_SENSORS = ("Accel", "Gyro", "Mag")
 
 # Group columns that we may want to look at separately
 # Pandas needs these as a list for indexing
@@ -52,39 +52,10 @@ ROLLING_WINDOW_WIDTH = "200ms"
 
 SKIP_STRINGS = ("processed", "trimmed", "combined")
 
-# Until we re-implement sensor parsing, explicitly set the sensor information
-DEFAULT_SENS_OVERRIDE = {
-    "Accel": SensorInfo(
-        name="Accel",
-        sample_rate=200,
-        sensitivity=2048,
-        full_scale=-1,
-        units="g",
-    ),
-    "Gyro": SensorInfo(
-        name="Gyro",
-        sample_rate=200,
-        sensitivity=16,
-        full_scale=-1,
-        units="dps",
-    ),
-    "Mag": SensorInfo(
-        name="Mag",
-        sample_rate=10,
-        sensitivity=1666,
-        full_scale=-1,
-        units="mT",
-    ),
-}
-
-
-class HasSensitivity(t.Protocol):  # noqa: D101
-    sensitivity: int
-
 
 def load_log(
     log_filepath: Path,
-    sensitivity_override: None | t.Mapping[str, HasSensitivity] = None,
+    sensitivity_override: SensorSpec | None = None,
     rolling_window_width: int | str = ROLLING_WINDOW_WIDTH,
 ) -> tuple[pd.DataFrame, HeaderInfo]:
     """
@@ -136,13 +107,16 @@ def load_log(
         # Convert measurements from raw counts to measured values
         # IMU-GPS devices do not record in raw counts
         if sensitivity_override:
-            sensor_info = sensitivity_override
-        else:
-            sensor_info = DEFAULT_SENS_OVERRIDE  # Use default until sensor parsing re-implemented
+            header_info.sensors = sensitivity_override
 
-        for sensor in IMU_SENSORS:
-            for col in SENSOR_GROUPS[sensor]:
-                full_data[col] = full_data[col] / sensor_info[sensor].sensitivity
+        for sensor_name, sensor_info in header_info.sensors.items():
+            if not isinstance(sensor_info, SensorInfo):
+                raise ValueError(
+                    f"Sensor override for '{sensor_name}' must be an instance of SensorInfo. Received: '{type(sensor_info)}'"  # noqa: E501
+                )
+
+            for col in SENSOR_GROUPS[sensor_name]:
+                full_data[col] = full_data[col] / sensor_info.sensitivity
 
         # Convert quaternion data, incoming as 16bit values, then normalize with RMS
         # IMU-GPS devices do not log quaternions
@@ -298,7 +272,7 @@ class XBMLog:  # noqa: D101
     def from_raw_log_file(
         cls,
         log_filepath: Path,
-        sensitivity_override: None | t.Mapping[str, HasSensitivity] = None,
+        sensitivity_override: SensorSpec | None = None,
         rolling_window_width: int | str = ROLLING_WINDOW_WIDTH,
         normalize_time: bool = False,
     ) -> XBMLog:
@@ -328,7 +302,7 @@ class XBMLog:  # noqa: D101
     def from_multi_raw_log(
         cls,
         log_filepaths: t.Sequence[Path],
-        sensitivity_override: None | t.Mapping[str, HasSensitivity] = None,
+        sensitivity_override: SensorSpec | None = None,
         rolling_window_width: int | str = ROLLING_WINDOW_WIDTH,
         normalize_time: bool = False,
     ) -> XBMLog:

@@ -1,6 +1,6 @@
 import pytest
 
-from xbmini.heading_parser import HeaderInfo, LoggerType, ParserError, parse_header
+from xbmini.heading_parser import HeaderInfo, LoggerType, ParserError, SensorInfo, parse_header
 
 SAMPLE_HEADER = [
     "Title, http://www.gcdataconcepts.com, HAM-IMU+alt, MPU9250 BMP280",
@@ -23,6 +23,17 @@ TRUTH_HEADER_INFO = HeaderInfo(
     firmware_version=2108,
     serial="ABC122345F0420",
     header_spec=["time", "pressure", "temperature"],
+    sensors={
+        "Accel": SensorInfo(
+            name="Accel", sample_rate=227, sensitivity=1000, full_scale=16, units="g"
+        ),
+        "Gyro": SensorInfo(
+            name="Gyro", sample_rate=227, sensitivity=1, full_scale=250, units="dps"
+        ),
+        "Mag": SensorInfo(
+            name="Mag", sample_rate=75, sensitivity=1, full_scale=4900000, units="nT"
+        ),
+    },
 )
 
 
@@ -81,5 +92,5 @@ SAMPLE_HEADER_MISSING_INFO = [
 
 
 def test_missing_info_raises() -> None:
-    with pytest.raises(ParserError, match="logger_type"):
+    with pytest.raises(ParserError, match="logger type"):
         parse_header(SAMPLE_HEADER_MISSING_INFO)

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from xbmini.heading_parser import HeaderInfo, LoggerType, SensorInfo
+from xbmini.heading_parser import HeaderInfo, LoggerType, SensorInfo, SensorSpec
 from xbmini.log_parser import XBMLog
 
 # Start with round-trips and drill into components later if necessary
@@ -22,12 +22,13 @@ def test_sensor_info_roundtrip() -> None:
     assert SensorInfo.from_json(DUMMY_SENSOR.to_json()) == DUMMY_SENSOR
 
 
+DUMMY_SENSORS: SensorSpec = {"Accel": DUMMY_SENSOR, "Gyro": DUMMY_SENSOR, "Mag": DUMMY_SENSOR}
 DUMMY_HEADER = HeaderInfo(
     n_header_lines=13,
     logger_type=LoggerType.HAM_IMU_ALT,
     firmware_version=42,
     serial="ABC123",
-    sensors={"The Best Sensor": DUMMY_SENSOR},
+    sensors=DUMMY_SENSORS,
     header_spec=["foo", "bar", "baz"],
 )
 
