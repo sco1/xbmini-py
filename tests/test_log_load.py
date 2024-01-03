@@ -39,15 +39,15 @@ def test_log_loader(tmp_log: Path) -> None:
 TRUTH_DF_GPS = pd.DataFrame(
     {
         "time": [dt.timedelta(seconds=9433200)],
-        "accel_x": [0.048828],
-        "accel_y": [0.048828],
-        "accel_z": [0.048828],
-        "gyro_x": [12.5],
-        "gyro_y": [12.5],
-        "gyro_z": [12.5],
-        "mag_x": [0.180072],
-        "mag_y": [0.180072],
-        "mag_z": [0.180072],
+        "accel_x": [0.1],
+        "accel_y": [0.1],
+        "accel_z": [0.1],
+        "gyro_x": [0.2],
+        "gyro_y": [0.2],
+        "gyro_z": [0.2],
+        "mag_x": [300],
+        "mag_y": [300],
+        "mag_z": [300],
         "pressure": [100000],  # With a single data row (no NaNs), this will be an int
         "temperature": [20.0],
         "time_of_week": [300000.6],
@@ -58,8 +58,8 @@ TRUTH_DF_GPS = pd.DataFrame(
         "hdop": [1.0],
         "vdop": [2.0],
         "utc_timestamp": [dt.datetime.fromtimestamp(9433200, tz=dt.timezone.utc)],
-        "total_accel": [0.084573],
-        "total_accel_rolling": [0.084573],
+        "total_accel": [0.03 ** (1 / 2)],
+        "total_accel_rolling": [0.03 ** (1 / 2)],
     }
 ).set_index("time")
 

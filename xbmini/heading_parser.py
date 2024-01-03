@@ -7,6 +7,8 @@ from dataclasses import asdict, dataclass, field, fields
 from enum import Enum
 from pathlib import Path
 
+DEFAULT_HEADER_PREFIX = ";"
+
 HEADER_MAP = {
     "Time": "time",
     "Ax": "accel_x",

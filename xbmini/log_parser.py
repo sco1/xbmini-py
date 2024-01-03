@@ -12,6 +12,7 @@ from pathlib import Path
 import pandas as pd
 
 from xbmini.heading_parser import (
+    DEFAULT_HEADER_PREFIX,
     HeaderInfo,
     LoggerType,
     ParserError,
@@ -49,8 +50,6 @@ GPS_COLS = [
 
 ROLLING_WINDOW_WIDTH = "200ms"
 
-DEFAULT_HEADER_PREFIX = ";"
-
 SKIP_STRINGS = ("processed", "trimmed", "combined")
 
 # Until we re-implement sensor parsing, explicitly set the sensor information
@@ -85,7 +84,6 @@ class HasSensitivity(t.Protocol):  # noqa: D101
 
 def load_log(
     log_filepath: Path,
-    sensor_groups: dict[str, list[str]] = SENSOR_GROUPS,
     sensitivity_override: None | t.Mapping[str, HasSensitivity] = None,
     rolling_window_width: int | str = ROLLING_WINDOW_WIDTH,
 ) -> tuple[pd.DataFrame, HeaderInfo]:
@@ -96,8 +94,10 @@ def load_log(
         * Time values are converted to a `pandas.TimedeltaIndex` and used as the `DataFrame` index
             * For IMU-GPS devices, this time value should usually be a valid UTC timestamp & is
             copied to a separate `"utc_timestamp"` column & converted to a datetime
-        * Accelerometer, Gyroscope, and Magnetometer data is converted from raw counts to their
-        respective units
+        * For HAM-IMU devices, the accelerometer, gyroscope, and magnetometer data is converted from
+        raw counts to their respective units
+            * IMU-GPS devices report as actual data values instead of counts so the conversion is
+            not required
         * Temperature is converted from mill-degree C to C
         * Quaternions, if present, are converted from raw counts and normalized with RMS
         * A `"total_accel"` column is calculated from the vector sum of the acceleration components
@@ -129,34 +129,42 @@ def load_log(
     # Convert time index to timedelta so we can use rolling time windows later
     full_data.index = pd.TimedeltaIndex(full_data.index, unit="S")
 
-    # Convert measurements from raw counts to measured values
-    if sensitivity_override:
-        sensor_info = sensitivity_override
-    else:
-        sensor_info = DEFAULT_SENS_OVERRIDE  # Use default until sensor parsing is re-implemented
-
-    for sensor in IMU_SENSORS:
-        for column in sensor_groups[sensor]:
-            full_data[column] = full_data[column] / sensor_info[sensor].sensitivity
-
-    # Calculate total acceleration & a rolling average
-    full_data["total_accel"] = full_data[sensor_groups["Accel"]].pow(2).sum(axis=1).pow(1 / 2)
-    full_data["total_accel_rolling"] = (
-        full_data["total_accel"].rolling(rolling_window_width, center=True).mean()
-    )
-
-    # Convert temperature from mill-degree C to C
+    # Temperature is always recorded as milli-degree Celsius
     full_data["temperature"] = full_data["temperature"] / 1000
 
-    # Convert quaternion data, incoming as 16bit values, then normalize with RMS
-    # IMU-GPS devices do not log quaternions
     if header_info.logger_type is not LoggerType.IMU_GPS:
-        quat_cols = sensor_groups["Quat"]
+        # Convert measurements from raw counts to measured values
+        # IMU-GPS devices do not record in raw counts
+        if sensitivity_override:
+            sensor_info = sensitivity_override
+        else:
+            sensor_info = DEFAULT_SENS_OVERRIDE  # Use default until sensor parsing re-implemented
+
+        for sensor in IMU_SENSORS:
+            for col in SENSOR_GROUPS[sensor]:
+                full_data[col] = full_data[col] / sensor_info[sensor].sensitivity
+
+        # Convert quaternion data, incoming as 16bit values, then normalize with RMS
+        # IMU-GPS devices do not log quaternions
+        quat_cols = SENSOR_GROUPS["Quat"]
         full_data[quat_cols] = full_data[quat_cols] / 65536
         q_rms = full_data[quat_cols].pow(2).sum(axis=1).pow(1 / 2)
         for col in quat_cols:
             # Not sure what the magic pandas invocation is do do this without a loop
             full_data[col] = full_data[col] / q_rms
+    elif header_info.logger_type is LoggerType.IMU_GPS:  # pragma: no branch
+        # IMU-GPS devices always record acceleration in milli-gees & gyro in milli-dps
+        for col in SENSOR_GROUPS["Accel"]:
+            full_data[col] = full_data[col] / 1000
+
+        for col in SENSOR_GROUPS["Gyro"]:
+            full_data[col] = full_data[col] / 1000
+
+    # Calculate total acceleration & a rolling average
+    full_data["total_accel"] = full_data[SENSOR_GROUPS["Accel"]].pow(2).sum(axis=1).pow(1 / 2)
+    full_data["total_accel_rolling"] = (
+        full_data["total_accel"].rolling(rolling_window_width, center=True).mean()
+    )
 
     return full_data, header_info
 
@@ -290,7 +298,6 @@ class XBMLog:  # noqa: D101
     def from_raw_log_file(
         cls,
         log_filepath: Path,
-        sensor_groups: dict[str, list[str]] = SENSOR_GROUPS,
         sensitivity_override: None | t.Mapping[str, HasSensitivity] = None,
         rolling_window_width: int | str = ROLLING_WINDOW_WIDTH,
         normalize_time: bool = False,
@@ -309,7 +316,6 @@ class XBMLog:  # noqa: D101
         # to False before returning
         log = cls.from_multi_raw_log(
             log_filepaths=(log_filepath,),
-            sensor_groups=sensor_groups,
             sensitivity_override=sensitivity_override,
             rolling_window_width=rolling_window_width,
             normalize_time=normalize_time,
@@ -322,7 +328,6 @@ class XBMLog:  # noqa: D101
     def from_multi_raw_log(
         cls,
         log_filepaths: t.Sequence[Path],
-        sensor_groups: dict[str, list[str]] = SENSOR_GROUPS,
         sensitivity_override: None | t.Mapping[str, HasSensitivity] = None,
         rolling_window_width: int | str = ROLLING_WINDOW_WIDTH,
         normalize_time: bool = False,
@@ -347,7 +352,6 @@ class XBMLog:  # noqa: D101
                 # Skip the header info since we've already grabbed it
                 load_log(
                     log_filepath=log_file,
-                    sensor_groups=sensor_groups,
                     sensitivity_override=sensitivity_override,
                     rolling_window_width=rolling_window_width,
                 )[0]
