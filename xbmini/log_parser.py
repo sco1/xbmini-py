@@ -320,7 +320,8 @@ class XBMLog:  # noqa: D101
         Build a log instance by joining the provided log files.
 
         It is assumed that all of the provided log files are from the same logging session, so they
-        share the same header information and timeseries.
+        share the same header information and timeseries. There is no validation of this assumption
+        performed by the code.
 
         To work around known issues with some firmware where the sensor headers do not provide the
         correct counts/unit conversion constant, `sensitivity_override` may be optionally specified

@@ -27,7 +27,7 @@ def test_no_header_raises(tmp_path: Path) -> None:
     tmp_log = tmp_path / "log.CSV"
     tmp_log.write_text("Hello world!")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ParserError):
         extract_header(tmp_log)
 
 
