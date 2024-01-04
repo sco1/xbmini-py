@@ -3,6 +3,7 @@ import math
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from xbmini.heading_parser import SensorInfo, SensorSpec
 from xbmini.log_parser import PRESS_TEMP_COLS, _split_cols, load_log
@@ -147,7 +148,48 @@ TRUTH_PRESS_TEMP_SPLIT = pd.DataFrame(
 ).set_index("time")
 
 
-def test_split_press_temp() -> None:
+def test_split_cols() -> None:
     press_temp, mpu = _split_cols(TRUTH_DF_MULTILINE, columns=PRESS_TEMP_COLS)
     pd.testing.assert_frame_equal(press_temp, TRUTH_PRESS_TEMP_SPLIT, check_exact=False)
     pd.testing.assert_frame_equal(mpu, TRUTH_MPU_SPLIT, check_exact=False)
+
+
+DUMMY_LOG_NO_SENSORS = """\
+;Title, http://www.gcdataconcepts.com, HAM-IMU+alt, MPU9250 BMP280
+;Version, 2108, Build date, Jan  1 2022,  SN:ABC122345F0420
+;Start_time, 2022-09-26, 08:13:29.030
+;Uptime, 6,sec,  Vbat, 4086, mv, EOL, 3500, mv
+;BMP280 SI, 0.500,s
+;Deadband, 0, counts
+;DeadbandTimeout, 5.000,sec
+;Time, Ax, Ay, Az, Gx, Gy, Gz, Qw, Qx, Qy, Qz, Mx, My, Mz, P, T
+0.01,1121,-15,24,-1,2,0,0.782,-0.028,-0.620,-0.039,7349,-68100,47099,98405,22431
+"""
+
+
+def test_log_no_sensors_no_override_raises(tmp_path: Path) -> None:
+    tmp_log = tmp_path / "log.CSV"
+    tmp_log.write_text(DUMMY_LOG_NO_SENSORS)
+
+    with pytest.raises(ValueError, match="No IMU sensor information"):
+        _ = load_log(tmp_log, raise_on_missing_sensor=False)
+
+
+def test_log_no_sensors_with_override(tmp_path: Path) -> None:
+    tmp_log = tmp_path / "log.CSV"
+    tmp_log.write_text(DUMMY_LOG_NO_SENSORS)
+
+    df, _ = load_log(tmp_log, raise_on_missing_sensor=False, sensitivity_override=SENS_OVERRIDE)
+    pd.testing.assert_frame_equal(df, TRUTH_DF_SENS_OVERRIDE, check_exact=False)
+
+
+def test_log_no_sensors_bad_override_raises(tmp_path: Path) -> None:
+    tmp_log = tmp_path / "log.CSV"
+    tmp_log.write_text(DUMMY_LOG_NO_SENSORS)
+
+    with pytest.raises(ValueError, match="SensorInfo"):
+        _ = load_log(
+            tmp_log,
+            raise_on_missing_sensor=False,
+            sensitivity_override={"Accel": []},  # type: ignore[arg-type]
+        )

@@ -57,6 +57,7 @@ def load_log(
     log_filepath: Path,
     sensitivity_override: SensorSpec | None = None,
     rolling_window_width: int | str = ROLLING_WINDOW_WIDTH,
+    raise_on_missing_sensor: t.Literal[True, False] = True,
 ) -> tuple[pd.DataFrame, HeaderInfo]:
     """
     Load data from the provided XBM log file.
@@ -83,7 +84,11 @@ def load_log(
     """
     # Could probably combine these 2 steps using the same open file object if performance becomes
     # an issue
-    header_info = parse_header(extract_header(log_filepath))
+    header_info = parse_header(
+        extract_header(log_filepath),
+        raise_on_missing_sensor=raise_on_missing_sensor,
+    )
+
     full_data = pd.read_csv(
         log_filepath,
         skiprows=header_info.n_header_lines,
@@ -108,6 +113,11 @@ def load_log(
         # IMU-GPS devices do not record in raw counts
         if sensitivity_override:
             header_info.sensors = sensitivity_override
+
+        if header_info.sensors is None:
+            raise ValueError(
+                "No IMU sensor information was found. Check the log header or provide an override."
+            )
 
         for sensor_name, sensor_info in header_info.sensors.items():
             if not isinstance(sensor_info, SensorInfo):

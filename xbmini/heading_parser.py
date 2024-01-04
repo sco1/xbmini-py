@@ -79,8 +79,26 @@ class SensorInfo:  # noqa: D101
         # Because our fields are all serializable, we can just use the constructor natively
         return cls(**json.loads(in_json))
 
+    @t.overload
     @classmethod
-    def from_header(cls, header_lines: abc.Sequence[str]) -> SensorSpec:
+    def from_header(  # noqa: D102  # pragma: no cover
+        cls, header_lines: abc.Sequence[str], raise_on_missing: t.Literal[True] = True
+    ) -> SensorSpec:
+        pass
+
+    @t.overload
+    @classmethod
+    def from_header(  # noqa: D102  # pragma: no cover
+        cls, header_lines: abc.Sequence[str], raise_on_missing: t.Literal[False]
+    ) -> SensorSpec | None:
+        pass
+
+    @classmethod
+    def from_header(
+        cls,
+        header_lines: abc.Sequence[str],
+        raise_on_missing: t.Literal[True, False] = True,
+    ) -> SensorSpec | None:
         """
         Build a `SensorSpec` for each of the sensors present on the HAM-IMU.
 
@@ -94,7 +112,8 @@ class SensorInfo:  # noqa: D101
         ;Mag, 75, 1, 4900000, nT
         ```
 
-        Information for all three sensors must be present in the source log file.
+        If `raise_on_missing` is `True`, information for all three sensors must be present
+        in the source log file.
         """
         buffer = []
         for line in header_lines:
@@ -102,7 +121,10 @@ class SensorInfo:  # noqa: D101
                 buffer.append(line)
 
         if len(buffer) != 3:
-            raise ParserError("Could not locate all sensor configuration rows.")
+            if raise_on_missing:
+                raise ParserError("Could not locate all sensor configuration rows.")
+            else:
+                return None
 
         sensor_spec = {}
         for line in buffer:
@@ -234,7 +256,9 @@ def extract_header(log_filepath: Path, header_prefix: str = ";") -> list[str]:
     return header_lines
 
 
-def parse_header(header_lines: abc.Sequence[str]) -> HeaderInfo:
+def parse_header(
+    header_lines: abc.Sequence[str], raise_on_missing_sensor: t.Literal[True, False] = True
+) -> HeaderInfo:
     """Parse log file information from the provided header lines."""
     firmware_version = -1
     logger_type = LoggerType.UNKNOWN
@@ -264,27 +288,21 @@ def parse_header(header_lines: abc.Sequence[str]) -> HeaderInfo:
         raise ParserError("Could not identify logger type from log header.")
 
     if logger_type is LoggerType.HAM_IMU_ALT:
-        sensors = SensorInfo.from_header(header_lines)
+        sensors = SensorInfo.from_header(header_lines, raise_on_missing=raise_on_missing_sensor)
     else:
         sensors = None
 
     # Column headers should be the last line, convert these to more readable names
     header_spec = _map_headers(header_lines[-1])
 
-    try:
-        header_info = HeaderInfo(
-            n_header_lines=len(header_lines),
-            logger_type=logger_type,
-            firmware_version=firmware_version,
-            serial=device_serial,
-            header_spec=header_spec,
-            sensors=sensors,
-        )
-    except NameError as e:
-        missing_varname = re.findall(r"'(\w+)'", str(e))[0]
-        raise ParserError(
-            f"Unable to locate necessary header information. Missing: '{missing_varname}'"
-        )
+    header_info = HeaderInfo(
+        n_header_lines=len(header_lines),
+        logger_type=logger_type,
+        firmware_version=firmware_version,
+        serial=device_serial,
+        header_spec=header_spec,
+        sensors=sensors,
+    )
 
     return header_info
 
