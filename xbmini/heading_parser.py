@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import json
 import re
+import typing as t
 from collections import abc
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import asdict, dataclass, fields
 from enum import Enum
 from pathlib import Path
+
+DEFAULT_HEADER_PREFIX = ";"
+IMU_SENSORS = ("Accel", "Gyro", "Mag")
 
 HEADER_MAP = {
     "Time": "time",
@@ -43,6 +47,13 @@ class ParserError(RuntimeError):  # noqa: D101
 class LoggerType(Enum):  # noqa: D101
     HAM_IMU_ALT = "HAM-IMU+alt"
     IMU_GPS = "GPS"
+    UNKNOWN = "null"
+
+
+class SensorSpec(t.TypedDict):  # noqa: D101
+    Accel: SensorInfo
+    Gyro: SensorInfo
+    Mag: SensorInfo
 
 
 @dataclass
@@ -68,6 +79,66 @@ class SensorInfo:  # noqa: D101
         # Because our fields are all serializable, we can just use the constructor natively
         return cls(**json.loads(in_json))
 
+    @t.overload
+    @classmethod
+    def from_header(  # noqa: D102  # pragma: no cover
+        cls, header_lines: abc.Sequence[str], raise_on_missing: t.Literal[True] = True
+    ) -> SensorSpec:
+        pass
+
+    @t.overload
+    @classmethod
+    def from_header(  # noqa: D102  # pragma: no cover
+        cls, header_lines: abc.Sequence[str], raise_on_missing: t.Literal[False]
+    ) -> SensorSpec | None:
+        pass
+
+    @classmethod
+    def from_header(
+        cls,
+        header_lines: abc.Sequence[str],
+        raise_on_missing: t.Literal[True, False] = True,
+    ) -> SensorSpec | None:
+        """
+        Build a `SensorSpec` for each of the sensors present on the HAM-IMU.
+
+        The HAM-IMU header is expected to provide rows of accelerometer, gyroscope, and magnetometer
+        configurations in the following form:
+
+        ```
+        ;MPU, SR (Hz), Sens (counts/unit), FullScale (units), Units
+        ;Accel, 225, 1000, 16, g
+        ;Gyro, 225, 1, 250, dps
+        ;Mag, 75, 1, 4900000, nT
+        ```
+
+        If `raise_on_missing` is `True`, information for all three sensors must be present
+        in the source log file.
+        """
+        buffer = []
+        for line in header_lines:
+            if any(line.startswith(s) for s in IMU_SENSORS):
+                buffer.append(line)
+
+        if len(buffer) != 3:
+            if raise_on_missing:
+                raise ParserError("Could not locate all sensor configuration rows.")
+            else:
+                return None
+
+        sensor_spec = {}
+        for line in buffer:
+            name, sr, sens, fs, units = line.split(",")
+            sensor_spec[name] = cls(
+                name=name.strip(),
+                sample_rate=int(sr),
+                sensitivity=int(sens),
+                full_scale=int(fs),
+                units=units.strip(),
+            )
+
+        return t.cast(SensorSpec, sensor_spec)
+
 
 @dataclass
 class HeaderInfo:  # noqa: D101
@@ -76,7 +147,7 @@ class HeaderInfo:  # noqa: D101
     firmware_version: int
     serial: str
     header_spec: list[str]
-    sensors: dict[str, SensorInfo] = field(default_factory=dict)
+    sensors: SensorSpec | None = None
 
     _custom_serialize: frozenset[str] = frozenset(("logger_type", "sensors", "_custom_serialize"))
 
@@ -92,9 +163,20 @@ class HeaderInfo:  # noqa: D101
 
         # Serialize the remainder. _custom_serialize is ignored
         out_dict["logger_type"] = self.logger_type.value
-        out_dict["sensors"] = {
-            sensor_name: sensor_obj.to_dict() for sensor_name, sensor_obj in self.sensors.items()
-        }
+
+        if self.sensors is None:
+            out_dict["sensors"] = None
+        else:
+            serialized_sensors = {}
+            for sensor_name, sensor_obj in self.sensors.items():
+                if not isinstance(sensor_obj, SensorInfo):
+                    raise ValueError(
+                        f"Sensor override for '{sensor_name}' must be an instance of SensorInfo. Received: '{type(sensor_obj)}'"  # noqa: E501
+                    )
+
+                serialized_sensors[sensor_name] = sensor_obj.to_dict()
+
+            out_dict["sensors"] = serialized_sensors
 
         return out_dict
 
@@ -111,10 +193,12 @@ class HeaderInfo:  # noqa: D101
         versions of their respective object types that require deserialization into instances.
         """
         tmp_dict["logger_type"] = LoggerType(tmp_dict["logger_type"])
-        tmp_dict["sensors"] = {
-            sensor_name: SensorInfo(**sensor_dict)
-            for sensor_name, sensor_dict in tmp_dict["sensors"].items()
-        }
+
+        if tmp_dict["sensors"] is not None:
+            tmp_dict["sensors"] = {
+                sensor_name: SensorInfo(**sensor_dict)
+                for sensor_name, sensor_dict in tmp_dict["sensors"].items()
+            }
 
         return cls(**tmp_dict)
 
@@ -172,9 +256,12 @@ def extract_header(log_filepath: Path, header_prefix: str = ";") -> list[str]:
     return header_lines
 
 
-def parse_header(header_lines: abc.Sequence[str]) -> HeaderInfo:
+def parse_header(
+    header_lines: abc.Sequence[str], raise_on_missing_sensor: t.Literal[True, False] = True
+) -> HeaderInfo:
     """Parse log file information from the provided header lines."""
     firmware_version = -1
+    logger_type = LoggerType.UNKNOWN
     for line in header_lines:
         if line.startswith("Title"):
             if "GPS" in line:
@@ -197,22 +284,25 @@ def parse_header(header_lines: abc.Sequence[str]) -> HeaderInfo:
 
             continue
 
+    if logger_type is LoggerType.UNKNOWN:
+        raise ParserError("Could not identify logger type from log header.")
+
+    if logger_type is LoggerType.HAM_IMU_ALT:
+        sensors = SensorInfo.from_header(header_lines, raise_on_missing=raise_on_missing_sensor)
+    else:
+        sensors = None
+
     # Column headers should be the last line, convert these to more readable names
     header_spec = _map_headers(header_lines[-1])
 
-    try:
-        header_info = HeaderInfo(
-            n_header_lines=len(header_lines),
-            logger_type=logger_type,
-            firmware_version=firmware_version,
-            serial=device_serial,
-            header_spec=header_spec,
-        )
-    except NameError as e:
-        missing_varname = re.findall(r"'(\w+)'", str(e))[0]
-        raise ParserError(
-            f"Unable to locate necessary header information. Missing: '{missing_varname}'"
-        )
+    header_info = HeaderInfo(
+        n_header_lines=len(header_lines),
+        logger_type=logger_type,
+        firmware_version=firmware_version,
+        serial=device_serial,
+        header_spec=header_spec,
+        sensors=sensors,
+    )
 
     return header_info
 

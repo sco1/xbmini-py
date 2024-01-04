@@ -3,8 +3,9 @@ from dataclasses import fields
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
-from xbmini.heading_parser import HeaderInfo, LoggerType, SensorInfo
+from xbmini.heading_parser import HeaderInfo, LoggerType, SensorInfo, SensorSpec
 from xbmini.log_parser import XBMLog
 
 # Start with round-trips and drill into components later if necessary
@@ -22,18 +23,48 @@ def test_sensor_info_roundtrip() -> None:
     assert SensorInfo.from_json(DUMMY_SENSOR.to_json()) == DUMMY_SENSOR
 
 
+DUMMY_SENSORS: SensorSpec = {"Accel": DUMMY_SENSOR, "Gyro": DUMMY_SENSOR, "Mag": DUMMY_SENSOR}
 DUMMY_HEADER = HeaderInfo(
     n_header_lines=13,
     logger_type=LoggerType.HAM_IMU_ALT,
     firmware_version=42,
     serial="ABC123",
-    sensors={"The Best Sensor": DUMMY_SENSOR},
+    sensors=DUMMY_SENSORS,
     header_spec=["foo", "bar", "baz"],
 )
 
 
 def test_header_info_roundtrip() -> None:
     assert HeaderInfo.from_json(DUMMY_HEADER.to_json()) == DUMMY_HEADER
+
+
+DUMMY_HEADER_NO_SENSORS = HeaderInfo(
+    n_header_lines=13,
+    logger_type=LoggerType.HAM_IMU_ALT,
+    firmware_version=42,
+    serial="ABC123",
+    sensors=None,
+    header_spec=["foo", "bar", "baz"],
+)
+
+
+def test_header_info_no_sensors_roundtrip() -> None:
+    assert HeaderInfo.from_json(DUMMY_HEADER_NO_SENSORS.to_json()) == DUMMY_HEADER_NO_SENSORS
+
+
+DUMMY_HEADER_BAD_SENSORS = HeaderInfo(
+    n_header_lines=13,
+    logger_type=LoggerType.HAM_IMU_ALT,
+    firmware_version=42,
+    serial="ABC123",
+    sensors={"Accel": []},  # type: ignore[arg-type]
+    header_spec=["foo", "bar", "baz"],
+)
+
+
+def test_header_info_bad_sensor_info_raises() -> None:
+    with pytest.raises(ValueError, match="SensorInfo"):
+        _ = DUMMY_HEADER_BAD_SENSORS.to_dict()
 
 
 def test_xbm_csv_roundtrip(tmp_log: Path) -> None:
