@@ -18,6 +18,14 @@ SAMPLE_LOG_FILE = """\
 0.01,1121,-15,24,-1,2,0,0.782,-0.028,-0.620,-0.039,7349,-68100,47099,98405,22431
 """
 
+# Generated manually from above log
+SAMPLE_LOG_FILE_PROCESSED = """\
+;{"drop_location": null, "drop_id": null, "_is_merged": false, "_is_trimmed": false, "_ground_pressure": 101325, "total_rigged_weight": null, "analysis_dt": 1705937161.423644, "drop_date": null, "header_info": {"n_header_lines": 12, "firmware_version": 2108, "serial": "ABC122345F0420", "header_spec": ["time", "accel_x", "accel_y", "accel_z", "gyro_x", "gyro_y", "gyro_z", "quat_w", "quat_x", "quat_y", "quat_z", "mag_x", "mag_y", "mag_z", "pressure", "temperature"], "logger_type": "HAM-IMU+alt", "sensors": {"Accel": {"name": "Accel", "sample_rate": 225, "sensitivity": 1000, "full_scale": 16, "units": "g"}, "Gyro": {"name": "Gyro", "sample_rate": 225, "sensitivity": 1, "full_scale": 250, "units": "dps"}, "Mag": {"name": "Mag", "sample_rate": 75, "sensitivity": 1, "full_scale": 4900000, "units": "nT"}}}}
+time,accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z,quat_w,quat_x,quat_y,quat_z,mag_x,mag_y,mag_z,total_accel,total_accel_rolling,pressure,temperature,press_alt_m,press_alt_ft
+
+0 days 00:00:00.010000,1.121,-0.015,0.024,-1.0,2.0,0.0,0.7826933821208445,-0.028024826981309012,-0.6205497403004138,-0.03903458043825184,7349.0,-68100.0,47099.0,1.1213572133802858,1.1213572133802858,98405,22.431,247.39859833055823,811.6653214028955
+"""
+
 SAMPLE_LOG_FILE_2 = """\
 ;Title, http://www.gcdataconcepts.com, HAM-IMU+alt, MPU9250 BMP280
 ;Version, 2108, Build date, Jan  1 2022,  SN:ABC122345F0420
@@ -39,6 +47,13 @@ SAMPLE_LOG_FILE_2 = """\
 def tmp_log(tmp_path: Path) -> Path:
     tmp_log = tmp_path / "log.CSV"
     tmp_log.write_text(SAMPLE_LOG_FILE)
+    return tmp_log
+
+
+@pytest.fixture
+def tmp_proc_log(tmp_path: Path) -> Path:
+    tmp_log = tmp_path / "log.CSV"
+    tmp_log.write_text(SAMPLE_LOG_FILE_PROCESSED)
     return tmp_log
 
 
@@ -77,6 +92,14 @@ SAMPLE_GPS_LOG = """\
 ;, GPS , 008, 00, 35, 043, 0, 0x00001211
 ;Time, Ax, Ay, Az, Gx, Gy, Gz, Mx, My, Mz, P, T, TOW, Lat,Lon, Height(m), MSL(m), hdop(m), vdop(m)
 9433200.0,100,100,100,200,200,200,300,300,300,100000,20000, 300000.6, 33.6571,-117.7462, 429.0, 457.0, 1.0,2.0
+"""
+
+# Generated manually from above log
+SAMPLE_GPS_LOG_PROCESSED = """\
+;{"drop_location": null, "drop_id": null, "_is_merged": true, "_is_trimmed": false, "_ground_pressure": 101325, "total_rigged_weight": null, "analysis_dt": 1704489848.43016, "drop_date": null, "header_info": {"n_header_lines": 22, "firmware_version": 2570, "serial": "ABC122345F0420", "header_spec": ["time", "accel_x", "accel_y", "accel_z", "gyro_x", "gyro_y", "gyro_z", "mag_x", "mag_y", "mag_z", "pressure", "temperature", "time_of_week", "latitude", "longitude", "height_ellipsoid", "height_msl", "hdop", "vdop"], "logger_type": "GPS", "sensors": null}}
+time,accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z,mag_x,mag_y,mag_z,total_accel,total_accel_rolling,pressure,temperature,press_alt_m,press_alt_ft,time_of_week,latitude,longitude,height_ellipsoid,height_msl,hdop,vdop,utc_timestamp
+
+0 days,0.1,0.1,0.1,0.2,0.2,0.2,300,300,300,0.17320508075688776,0.17320508075688776,100000,20.0,111.53699607696909,365.9305767293202,300000.6,33.6571,-117.7462,429.0,457.0,1.0,2.0,1970-04-20 04:20:00+00:00
 """
 
 

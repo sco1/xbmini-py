@@ -30,7 +30,7 @@ def test_gps_data_split(tmp_log_gps: Path) -> None:
 def test_xbm_from_multi(tmp_multi_log: list[Path]) -> None:
     log_obj = XBMLog.from_multi_raw_log(tmp_multi_log)
 
-    check_index = pd.TimedeltaIndex((dt.timedelta(seconds=0.01), dt.timedelta(seconds=0.02)))
+    check_index = pd.to_timedelta((dt.timedelta(seconds=0.01), dt.timedelta(seconds=0.02)))
     pd.testing.assert_index_equal(log_obj.mpu.index, check_index, check_names=False)
 
     assert log_obj._is_merged is True
@@ -39,7 +39,7 @@ def test_xbm_from_multi(tmp_multi_log: list[Path]) -> None:
 def test_xbm_from_multi_normalized_timestamp(tmp_multi_log: list[Path]) -> None:
     log_obj = XBMLog.from_multi_raw_log(tmp_multi_log, normalize_time=True)
 
-    check_index = pd.TimedeltaIndex((dt.timedelta(seconds=0), dt.timedelta(seconds=0.01)))
+    check_index = pd.to_timedelta((dt.timedelta(seconds=0), dt.timedelta(seconds=0.01)))
     pd.testing.assert_index_equal(log_obj.mpu.index, check_index, check_names=False)
 
     assert log_obj._is_merged is True

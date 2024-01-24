@@ -154,7 +154,7 @@ def _serialize_df(in_df: pd.DataFrame) -> str:
 def _deserialze_df(in_json: str) -> pd.DataFrame:
     log_df = pd.read_json(in_json, date_unit="ns")
     # Set the index name explicitly since none of the to_json() orient options will preserve it
-    log_df.index = pd.TimedeltaIndex(log_df.index, unit="ns").rename("time")
+    log_df.index = pd.to_timedelta(log_df.index, unit="ns").rename("time")
     return log_df
 
 

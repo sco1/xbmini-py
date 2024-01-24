@@ -53,6 +53,39 @@ ROLLING_WINDOW_WIDTH = "200ms"
 SKIP_STRINGS = ("processed", "trimmed", "combined")
 
 
+def _apply_sensitivity(
+    log_data: pd.DataFrame, sensor_info: SensorSpec, reverse: bool = False
+) -> pd.DataFrame:
+    for sensor_name, info in sensor_info.items():
+        if not isinstance(info, SensorInfo):
+            raise ValueError(
+                f"Sensor override for '{sensor_name}' must be an instance of SensorInfo. Received: '{type(info)}'"  # noqa: E501
+            )
+
+        for col in SENSOR_GROUPS[sensor_name]:
+            if reverse:
+                log_data[col] = log_data[col] * info.sensitivity
+            else:
+                log_data[col] = log_data[col] / info.sensitivity
+
+    return log_data
+
+
+def _calculate_total_accel(log_data: pd.DataFrame, rolling_window_width: int | str) -> pd.DataFrame:
+    """
+    Calculate total acceleration from the incoming accelerometer components.
+
+    Total acceleration is calculated as both a direct vector sum as well as a vector sum of a
+    rolling window of the specified width.
+    """
+    log_data["total_accel"] = log_data[SENSOR_GROUPS["Accel"]].pow(2).sum(axis=1).pow(1 / 2)
+    log_data["total_accel_rolling"] = (
+        log_data["total_accel"].rolling(rolling_window_width, center=True).mean()
+    )
+
+    return log_data
+
+
 def load_log(
     log_filepath: Path,
     sensitivity_override: SensorSpec | None = None,
@@ -103,7 +136,7 @@ def load_log(
         full_data["utc_timestamp"] = pd.to_datetime(full_data.index, unit="s", utc=True)
 
     # Convert time index to timedelta so we can use rolling time windows later
-    full_data.index = pd.TimedeltaIndex(full_data.index, unit="S")
+    full_data.index = pd.to_timedelta(full_data.index, unit="s")
 
     # Temperature is always recorded as milli-degree Celsius
     full_data["temperature"] = full_data["temperature"] / 1000
@@ -119,14 +152,7 @@ def load_log(
                 "No IMU sensor information was found. Check the log header or provide an override."
             )
 
-        for sensor_name, sensor_info in header_info.sensors.items():
-            if not isinstance(sensor_info, SensorInfo):
-                raise ValueError(
-                    f"Sensor override for '{sensor_name}' must be an instance of SensorInfo. Received: '{type(sensor_info)}'"  # noqa: E501
-                )
-
-            for col in SENSOR_GROUPS[sensor_name]:
-                full_data[col] = full_data[col] / sensor_info.sensitivity
+        full_data = _apply_sensitivity(full_data, header_info.sensors)
 
         # Convert quaternion data, incoming as 16bit values, then normalize with RMS
         # IMU-GPS devices do not log quaternions
@@ -144,11 +170,7 @@ def load_log(
         for col in SENSOR_GROUPS["Gyro"]:
             full_data[col] = full_data[col] / 1000
 
-    # Calculate total acceleration & a rolling average
-    full_data["total_accel"] = full_data[SENSOR_GROUPS["Accel"]].pow(2).sum(axis=1).pow(1 / 2)
-    full_data["total_accel_rolling"] = (
-        full_data["total_accel"].rolling(rolling_window_width, center=True).mean()
-    )
+    full_data = _calculate_total_accel(full_data, rolling_window_width)
 
     return full_data, header_info
 
@@ -285,6 +307,7 @@ class XBMLog:  # noqa: D101
         sensitivity_override: SensorSpec | None = None,
         rolling_window_width: int | str = ROLLING_WINDOW_WIDTH,
         normalize_time: bool = False,
+        raise_on_missing_sensor: t.Literal[True, False] = True,
     ) -> XBMLog:
         """
         Build a log instance from the provided log file.
@@ -303,6 +326,7 @@ class XBMLog:  # noqa: D101
             sensitivity_override=sensitivity_override,
             rolling_window_width=rolling_window_width,
             normalize_time=normalize_time,
+            raise_on_missing_sensor=raise_on_missing_sensor,
         )
         log._is_merged = False
 
@@ -315,6 +339,7 @@ class XBMLog:  # noqa: D101
         sensitivity_override: SensorSpec | None = None,
         rolling_window_width: int | str = ROLLING_WINDOW_WIDTH,
         normalize_time: bool = False,
+        raise_on_missing_sensor: t.Literal[True, False] = True,
     ) -> XBMLog:
         """
         Build a log instance by joining the provided log files.
@@ -339,6 +364,7 @@ class XBMLog:  # noqa: D101
                     log_filepath=log_file,
                     sensitivity_override=sensitivity_override,
                     rolling_window_width=rolling_window_width,
+                    raise_on_missing_sensor=raise_on_missing_sensor,
                 )[0]
                 for log_file in log_filepaths
             ]
@@ -355,13 +381,23 @@ class XBMLog:  # noqa: D101
 
     @classmethod
     def from_processed_csv(
-        cls, in_log: Path | io.StringIO, header_prefix: str = DEFAULT_HEADER_PREFIX
+        cls,
+        in_log: Path | io.StringIO,
+        header_prefix: str = DEFAULT_HEADER_PREFIX,
+        sensitivity_override: SensorSpec | None = None,
+        rolling_window_width: int | str = ROLLING_WINDOW_WIDTH,
     ) -> XBMLog:
         """
         Rebuild a class instance from the provided CSV filepath.
 
         It is assumed that logger metadata has been serialized into JSON and inserted as a single
         header line at the top of the file using the provided `header_prefix`.
+
+        If a sensitivity override is provided, the existing conversion factor of the serialized data
+        (assumed to be present) is reverted & the incoming override is applied to the log data. Note
+        that this is only applicable to HAM-IMU devices, IMU-GPS devices do not report raw counts.
+
+        NOTE: Rolling window values are always recalculated during the loading process.
         """
         if isinstance(in_log, Path):
             with in_log.open("r") as f:
@@ -371,8 +407,27 @@ class XBMLog:  # noqa: D101
             metadata_header = in_log.readline().lstrip(header_prefix).strip()
             full_data = pd.read_csv(in_log, index_col=0)
 
-        full_data.index = pd.TimedeltaIndex(full_data.index)
+        full_data.index = pd.to_timedelta(full_data.index)
         metadata = cls._deserialize_metadata(metadata_header)
+
+        if sensitivity_override is not None:
+            header_info = metadata.get("header_info", None)
+            if not isinstance(header_info, HeaderInfo):
+                raise ValueError("Could not obtain header information from the processed log file.")
+
+            if header_info.logger_type is LoggerType.HAM_IMU_ALT:
+                # Revert existing conversions & apply the incoming sensor override
+                # If we're here, assume we have a valid existing sensor specification
+                full_data = _apply_sensitivity(full_data, header_info.sensors, reverse=True)  # type: ignore[arg-type]  # noqa: E501
+
+                header_info.sensors = sensitivity_override
+                full_data = _apply_sensitivity(full_data, header_info.sensors)
+            else:
+                print("Sensitivity override not applicable to non-HAM-IMU loggers, ignoring...")
+
+        # Recalculate the rolling windows, as either the sensitivities or window width may have
+        # changed
+        full_data = _calculate_total_accel(full_data, rolling_window_width)
 
         return cls(log_data=full_data, **metadata)
 
@@ -403,6 +458,7 @@ def batch_combine(
     pattern: str = "*.CSV",
     dry_run: bool = False,
     skip_strs: abc.Collection[str] = SKIP_STRINGS,
+    sensitivity_override: SensorSpec | None = None,
 ) -> None:
     """
     Batch combine raw XBM log files for each logger and dump a serialized `XBMLog` instance to CSV.
@@ -420,6 +476,11 @@ def batch_combine(
     """
     log_dirs = {log_file.parent for log_file in top_dir.rglob(pattern)}
     print(f"Found {len(log_dirs)} logger(s) to combine.")
+
+    if sensitivity_override is not None:
+        raise_on_missing_sensor = False
+    else:
+        raise_on_missing_sensor = True
 
     for log_dir in log_dirs:
         snipped_dir = f"...{os.sep}{os.sep.join(str(log_dir).split(os.sep)[-4:])}"
@@ -440,7 +501,12 @@ def batch_combine(
         )
 
         try:
-            log = XBMLog.from_multi_raw_log(files_to_combine, normalize_time=True)
+            log = XBMLog.from_multi_raw_log(
+                files_to_combine,
+                normalize_time=True,
+                sensitivity_override=sensitivity_override,
+                raise_on_missing_sensor=raise_on_missing_sensor,
+            )
             log.to_csv(out_filepath)
         except ParserError as e:
             print(f"{e}, skipping logger")

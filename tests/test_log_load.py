@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from xbmini.heading_parser import SensorInfo, SensorSpec
-from xbmini.log_parser import PRESS_TEMP_COLS, _split_cols, load_log
+from xbmini.log_parser import PRESS_TEMP_COLS, XBMLog, _split_cols, load_log
 
 TRUTH_DF = pd.DataFrame(
     {
@@ -193,3 +193,11 @@ def test_log_no_sensors_bad_override_raises(tmp_path: Path) -> None:
             raise_on_missing_sensor=False,
             sensitivity_override={"Accel": []},  # type: ignore[arg-type]
         )
+
+
+def test_load_processed_new_override(tmp_proc_log: Path) -> None:
+    log_obj = XBMLog.from_processed_csv(tmp_proc_log, sensitivity_override=SENS_OVERRIDE)
+    df = log_obj._full_dataframe
+    df = df.drop(columns=["press_alt_m", "press_alt_ft"])  # Derived quantities & not relevant here
+
+    pd.testing.assert_frame_equal(df, TRUTH_DF_SENS_OVERRIDE, check_exact=False, check_like=True)
