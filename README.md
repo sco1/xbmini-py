@@ -1,10 +1,9 @@
 # xbmini-py
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/xbmini-py)](https://pypi.org/project/xbmini-pyxbmini-py/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/xbmini-py/0.3.0?logo=python&logoColor=FFD43B)](https://pypi.org/project/xbmini-py/)
 [![PyPI](https://img.shields.io/pypi/v/xbmini-py)](https://pypi.org/project/xbmini-py/)
 [![PyPI - License](https://img.shields.io/pypi/l/xbmini-py?color=magenta)](https://github.com/sco1/xbmini-py/blob/master/LICENSE)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/sco1/xbmini-py/main.svg)](https://results.pre-commit.ci/latest/github/sco1/xbmini-py/main)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-black)](https://github.com/psf/black)
-[![Open in Visual Studio Code](https://img.shields.io/badge/Open%20in-VSCode.dev-blue)](https://vscode.dev/github.com/sco1/xbmini-py)
 
 Python Toolkit for the [GCDC HAM](http://www.gcdataconcepts.com/ham.html)
 
@@ -29,21 +28,18 @@ cog.out(
 ]]] -->
 ```
 $ xbmini --help
-                                                                               
- Usage: xbmini [OPTIONS] COMMAND [ARGS]...                                     
-                                                                               
-+- Options -------------------------------------------------------------------+
-| --help          Show this message and exit.                                 |
-+-----------------------------------------------------------------------------+
-+- Commands ------------------------------------------------------------------+
-| batch-combine  Batch combine XBM files for each logger and dump a           |
-|                serialized `XBMLog` instance to CSV.                         |
-| dash           Dash UI launchers                                            |
-+-----------------------------------------------------------------------------+
+Usage: xbmini [OPTIONS] COMMAND [ARGS]...
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  batch-combine  Batch combine XBM files for each logger and dump a...
+  dash           Dash UI launchers
 ```
 <!-- [[[end]]] -->
 
-## Usage
+## CLI Usage
 ### `xbmini batch-combine`
 Batch combine XBM files for each logger and dump a serialized `XBMLog` instance to a CSV in its respective logger's directory.
 #### Input Parameters
@@ -73,16 +69,14 @@ cog.out(
 ]]] -->
 ```
 $ xbmini dash --help
-                                                                               
- Usage: xbmini dash [OPTIONS] COMMAND [ARGS]...                                
-                                                                               
- Dash UI launchers                                                             
-                                                                               
-+- Options -------------------------------------------------------------------+
-| --help          Show this message and exit.                                 |
-+-----------------------------------------------------------------------------+
-+- Commands ------------------------------------------------------------------+
-| trim     Helper UI for trimming serialized XBMLog CSVs.                     |
-+-----------------------------------------------------------------------------+
+Usage: xbmini dash [OPTIONS] COMMAND [ARGS]...
+
+  Dash UI launchers
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  trim  Helper UI for trimming serialized XBMLog CSVs.
 ```
 <!-- [[[end]]] -->
