@@ -34,8 +34,8 @@ def batch_combine(
     if top_dir is None:
         try:
             top_dir = prompts.prompt_for_dir(title="Select Top Level Log Directory")
-        except ValueError:
-            raise click.ClickException("No directory selected, aborting.")
+        except ValueError as e:
+            raise click.ClickException("No directory selected, aborting.") from e
 
     log_parser.batch_combine(
         top_dir=top_dir,

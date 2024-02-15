@@ -143,7 +143,7 @@ def trim_plot_data(
     name, ext = os.path.splitext(in_filename)
     out_filename = f"{name}_trimmed{ext}"
 
-    return dict(content=log._to_string(), filename=out_filename), "Trimmed file saved successfully!"
+    return {"content": log._to_string(), "filename": out_filename}, "Trim file saved successfully!"
 
 
 def _serialize_df(in_df: pd.DataFrame) -> str:
