@@ -3,11 +3,17 @@ import datetime as dt
 import io
 import os
 
-import dash_bootstrap_components as dbc
+try:
+    import dash_bootstrap_components as dbc
+    from dash import Dash, dcc, exceptions, html, no_update
+    from dash.dependencies import Input, Output, State
+except ImportError as e:
+    raise RuntimeError(
+        "Dash has not been installed, please install xbminipy with 'trimapp' extras"
+    ) from e
+
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Dash, dcc, exceptions, html, no_update
-from dash.dependencies import Input, Output, State
 
 from xbmini.log_parser import XBMLog
 from xbmini.viz import make_plot
