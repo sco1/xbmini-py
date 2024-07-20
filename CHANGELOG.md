@@ -1,6 +1,13 @@
 # Changelog
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (`<major>`.`<minor>`.`<patch>`)
 
+## [v0.4.0]
+### Changed
+* Bump minimum Python version to 3.11
+* #26 Make `dash` an optional install; to use the interactive trimming app, use `trimapp` extras to install required components
+* #26 Hide `dash` trimming app from CLI interface if dependencies are not installed
+* Add `matplotlib`-based log trimming helper
+
 ## [v0.3.0]
 ### Changed
 * #21 Normalize handling of sensor overrides for HAM-IMU devices
