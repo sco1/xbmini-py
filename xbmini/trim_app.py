@@ -7,7 +7,7 @@ try:
     import dash_bootstrap_components as dbc
     from dash import Dash, dcc, exceptions, html, no_update
     from dash.dependencies import Input, Output, State
-except ImportError as e:
+except (ImportError, ModuleNotFoundError) as e:
     raise RuntimeError(
         "Dash has not been installed, please install xbminipy with 'trimapp' extras"
     ) from e

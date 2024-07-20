@@ -138,6 +138,10 @@ def load_log(
     # Convert time index to timedelta so we can use rolling time windows later
     full_data.index = pd.to_timedelta(full_data.index, unit="s")
 
+    # Not sure how prevalent it ends up being but there are some instances where the time ends up
+    # not being monotonic, ensure the index is sorted just in case
+    full_data.sort_index(inplace=True)
+
     # Temperature is always recorded as milli-degree Celsius
     full_data["temperature"] = full_data["temperature"] / 1000
 
@@ -296,7 +300,10 @@ class XBMLog:  # noqa: D101
         full_data = self._full_dataframe
         buff = io.StringIO(newline="")
         buff.write(f"{header_prefix}{self._serialize_metadata()}\n")
-        full_data.to_csv(buff)
+
+        # Explicitly specify terminator to prevent extra newlines on Windows when the buffer is
+        # dumped
+        full_data.to_csv(buff, lineterminator="\n")
 
         return buff.getvalue()
 
