@@ -27,7 +27,13 @@ cog.out(
 ]]] -->
 ```
 $ xbmini --help
+Usage: xbmini [OPTIONS] COMMAND [ARGS]...
 
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  batch-combine  Batch combine XBM files for each logger and dump a...
 ```
 <!-- [[[end]]] -->
 
@@ -63,6 +69,14 @@ cog.out(
 ]]] -->
 ```
 $ xbmini dash --help
+Usage: xbmini dash [OPTIONS] COMMAND [ARGS]...
 
+  Dash UI launchers
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  trim  Helper UI for trimming serialized XBMLog CSVs.
 ```
 <!-- [[[end]]] -->
