@@ -138,6 +138,10 @@ def load_log(
     # Convert time index to timedelta so we can use rolling time windows later
     full_data.index = pd.to_timedelta(full_data.index, unit="s")
 
+    # Not sure how prevalent it ends up being but there are some instances where the time ends up
+    # not being monotonic, ensure the index is sorted just in case
+    full_data.sort_index(inplace=True)
+
     # Temperature is always recorded as milli-degree Celsius
     full_data["temperature"] = full_data["temperature"] / 1000
 
@@ -296,9 +300,47 @@ class XBMLog:  # noqa: D101
         full_data = self._full_dataframe
         buff = io.StringIO(newline="")
         buff.write(f"{header_prefix}{self._serialize_metadata()}\n")
-        full_data.to_csv(buff)
+
+        # Explicitly specify terminator to prevent extra newlines on Windows when the buffer is
+        # dumped
+        full_data.to_csv(buff, lineterminator="\n")
 
         return buff.getvalue()
+
+    def trim_log(
+        self,
+        elapsed_start: float | dt.timedelta,
+        elapsed_end: float | dt.timedelta,
+        normalize_time: bool = True,
+    ) -> None:
+        """
+        Trim the log dataframes between the provided start & end times.
+
+        The `normalize_time` flag may be set to normalize the time index so it starts at 0 seconds,
+        helping for cases where the XBM starts at some abnormally large time index.
+        """
+        if not isinstance(elapsed_start, dt.timedelta):
+            elapsed_start = dt.timedelta(seconds=elapsed_start)
+        if not isinstance(elapsed_end, dt.timedelta):
+            elapsed_end = dt.timedelta(seconds=elapsed_end)
+
+        self.mpu = self.mpu.loc[(self.mpu.index >= elapsed_start) & (self.mpu.index <= elapsed_end)]
+        self.press_temp = self.press_temp.loc[
+            (self.press_temp.index >= elapsed_start) & (self.press_temp.index <= elapsed_end)
+        ]
+        if self.gps is not None:
+            self.gps = self.gps.loc[
+                (self.gps.index >= elapsed_start) & (self.gps.index <= elapsed_end)
+            ]
+
+        if normalize_time:
+            self.mpu.index = self.mpu.index - self.mpu.index[0]
+            self.press_temp.index = self.press_temp.index - self.press_temp.index[0]
+
+            if self.gps is not None:
+                self.gps.index = self.gps.index - self.gps.index[0]
+
+        self._is_trimmed = True
 
     @classmethod
     def from_raw_log_file(

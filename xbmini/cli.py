@@ -4,7 +4,7 @@ import click
 import typer
 from sco1_misc import prompts
 
-from xbmini import log_parser, trim_app
+from xbmini import log_parser
 
 xbmini_cli = typer.Typer(add_completion=False, no_args_is_help=True)
 
@@ -43,16 +43,6 @@ def batch_combine(
         dry_run=dry_run,
         skip_strs=skip_strs,
     )
-
-
-app_cli = typer.Typer(add_completion=False)
-xbmini_cli.add_typer(app_cli, name="dash", help="Dash UI launchers")
-
-
-@app_cli.command(short_help="Helper UI for trimming serialized XBMLog CSVs.")
-def trim(debug: bool = typer.Option(False)) -> None:  # noqa: D103
-    print("Press CTRL+C to quit")
-    trim_app.app.run(debug=debug, dev_tools_silence_routes_logging=True)
 
 
 if __name__ == "__main__":  # pragma: no cover
