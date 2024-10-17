@@ -307,6 +307,41 @@ class XBMLog:  # noqa: D101
 
         return buff.getvalue()
 
+    def trim_log(
+        self,
+        elapsed_start: float | dt.timedelta,
+        elapsed_end: float | dt.timedelta,
+        normalize_time: bool = True,
+    ) -> None:
+        """
+        Trim the log dataframes between the provided start & end times.
+
+        The `normalize_time` flag may be set to normalize the time index so it starts at 0 seconds,
+        helping for cases where the XBM starts at some abnormally large time index.
+        """
+        if not isinstance(elapsed_start, dt.timedelta):
+            elapsed_start = dt.timedelta(seconds=elapsed_start)
+        if not isinstance(elapsed_end, dt.timedelta):
+            elapsed_end = dt.timedelta(seconds=elapsed_end)
+
+        self.mpu = self.mpu.loc[(self.mpu.index >= elapsed_start) & (self.mpu.index <= elapsed_end)]
+        self.press_temp = self.press_temp.loc[
+            (self.press_temp.index >= elapsed_start) & (self.press_temp.index <= elapsed_end)
+        ]
+        if self.gps is not None:
+            self.gps = self.gps.loc[
+                (self.gps.index >= elapsed_start) & (self.gps.index <= elapsed_end)
+            ]
+
+        if normalize_time:
+            self.mpu.index = self.mpu.index - self.mpu.index[0]
+            self.press_temp.index = self.press_temp.index - self.press_temp.index[0]
+
+            if self.gps is not None:
+                self.gps.index = self.gps.index - self.gps.index[0]
+
+        self._is_trimmed = True
+
     @classmethod
     def from_raw_log_file(
         cls,
