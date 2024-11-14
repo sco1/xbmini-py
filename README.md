@@ -33,12 +33,13 @@ Options:
   --help  Show this message and exit.
 
 Commands:
-  batch-combine  Batch combine XBM files for each logger and dump a...
+  merge  XBMini log merging.
+  trim   XBMini log trimming.
 ```
 <!-- [[[end]]] -->
 
 ## CLI Usage
-### `xbmini batch-combine`
+### `xbmini merge batch`
 Batch combine XBM files for each logger and dump a serialized `XBMLog` instance to a CSV in its respective logger's directory.
 #### Input Parameters
 | Parameter       | Description                                            | Type         | Default                                |
