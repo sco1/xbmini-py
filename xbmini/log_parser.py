@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import io
 import json
+import operator
 import os
 import typing as t
 from collections import abc
@@ -11,11 +12,11 @@ from pathlib import Path
 
 import pandas as pd
 
+from xbmini import ParserError
 from xbmini.heading_parser import (
     DEFAULT_HEADER_PREFIX,
     HeaderInfo,
     LoggerType,
-    ParserError,
     SensorInfo,
     SensorSpec,
     extract_header,
@@ -495,12 +496,89 @@ class XBMLog:  # noqa: D101
         return metadata
 
 
+def bin_logging_sessions(
+    log_paths: abc.Iterable[Path], ensure_sorted: bool = True
+) -> list[list[Path]]:
+    """
+    Inspect each of the provided log files & bin them into sessions based on shutdown state.
+
+    Log files usually tend to end in one of the following ways:
+        * Log file size threshold reach, log continued in new file, no EOF comment
+        * Device shut down using power switch, EOF comment, e.g.
+        `; 1.23 stopping logging: shutdown: switched off`
+        * Device shut down due to low battery, EOF comment, e.g.
+        `...`
+
+    The provided logs are iterated through & grouped together until the device has signaled that it
+    has shut down.
+
+    If `ensure_sorted` is `True`, the provided iterable of log paths is sorted based on the file
+    stems. Otherwise it is iterated through in the order given.
+    """
+    if ensure_sorted:
+        log_paths = sorted(log_paths, key=operator.attrgetter("stem"))
+
+    log_sessions = []
+    session = []
+    for f in log_paths:
+        # For simplicity, read the entire file into memory. Most of the time the log file size is
+        # relatively small so the performance impact vs. just iterating to the last line should be
+        # minimal, but worth keeping an eye on.
+        session.append(f)
+
+        try:
+            last_line = f.read_text().splitlines()[-1].strip()
+        except IndexError as e:
+            raise ParserError(f"No log data found in file: {f}") from e
+
+        if "shutdown" in last_line:
+            log_sessions.append(session)
+            session = []
+
+    # Clean up any dangling session
+    if session:
+        log_sessions.append(session)
+
+    return log_sessions
+
+
+def _merge_sessions(
+    log_sessions: list[list[Path]],
+    log_dir: Path,
+    snipped_dir: str,
+    sensitivity_override: SensorSpec | None,
+    raise_on_missing_sensor: bool,
+) -> None:
+    for i, session_files in enumerate(log_sessions):
+        out_filepath = log_dir / f"{log_dir.name}_session_{i}_processed.CSV"
+        print(
+            f"Combining {len(session_files)} log(s) from {snipped_dir}, session {i} ... ",
+            end="",
+            flush=True,
+        )
+
+        try:
+            log = XBMLog.from_multi_raw_log(
+                session_files,
+                normalize_time=True,
+                sensitivity_override=sensitivity_override,
+                raise_on_missing_sensor=raise_on_missing_sensor,
+            )
+            log.to_csv(out_filepath)
+        except ParserError as e:
+            print(f"{e}, skipping session")
+            continue
+
+        print("Done!")
+
+
 def batch_combine(
     top_dir: Path,
     pattern: str = "*.CSV",
     dry_run: bool = False,
     skip_strs: abc.Collection[str] = SKIP_STRINGS,
     sensitivity_override: SensorSpec | None = None,
+    bin_sessions: bool = True,
 ) -> None:
     """
     Batch combine raw XBM log files for each logger and dump a serialized `XBMLog` instance to CSV.
@@ -511,8 +589,9 @@ def batch_combine(
     If `dry_run` is specified, a listing of logger directories is printed and no CSV files will be
     generated.
 
-    NOTE: All CSV files in a specific logger's directory are assumed to be from the same session &
-    are combined into a single file.
+    If `bin_sessions` is `True`, an attempt is made to bin sessions together if multiple sessions
+    are present in a log directory. Otherwise all logs in a given directory are assumed to be part
+    of the same session.
 
     NOTE: Any pre-existing combined file in a given logger directory will be overwritten.
     """
@@ -526,32 +605,49 @@ def batch_combine(
 
     for log_dir in log_dirs:
         snipped_dir = f"...{os.sep}{os.sep.join(str(log_dir).split(os.sep)[-4:])}"
-        out_filepath = log_dir / f"{log_dir.name}_processed.CSV"
 
         # Filter files using the given skip_strs
         files_to_combine = []
         for file in log_dir.glob(pattern):
-            if not any(substr in file.name for substr in skip_strs):
+            if not any(substr in file.stem for substr in skip_strs):
                 files_to_combine.append(file)
 
-        if dry_run:
-            print(f"Would combine {len(files_to_combine)} log(s) from {snipped_dir}")
-            continue
+        if bin_sessions:
+            log_sessions = bin_logging_sessions(files_to_combine)
+            if dry_run:
+                print(f"Found {len(log_sessions)} log session(s) to combine in {snipped_dir}.")
+                continue
 
-        print(
-            f"Combining {len(files_to_combine)} log(s) from {snipped_dir} ... ", end="", flush=True
-        )
-
-        try:
-            log = XBMLog.from_multi_raw_log(
-                files_to_combine,
-                normalize_time=True,
+            # Parsing exceptions are handled by the helper function on a per-session basis
+            _merge_sessions(
+                log_sessions=log_sessions,
+                log_dir=log_dir,
+                snipped_dir=snipped_dir,
                 sensitivity_override=sensitivity_override,
                 raise_on_missing_sensor=raise_on_missing_sensor,
             )
-            log.to_csv(out_filepath)
-        except ParserError as e:
-            print(f"{e}, skipping logger")
-            continue
+        else:
+            if dry_run:
+                print(f"Would combine {len(files_to_combine)} log(s) from {snipped_dir}")
+                continue
 
-        print("Done!")
+            out_filepath = log_dir / f"{log_dir.name}_processed.CSV"
+            print(
+                f"Combining {len(files_to_combine)} log(s) from {snipped_dir} ... ",
+                end="",
+                flush=True,
+            )
+
+            try:
+                log = XBMLog.from_multi_raw_log(
+                    files_to_combine,
+                    normalize_time=True,
+                    sensitivity_override=sensitivity_override,
+                    raise_on_missing_sensor=raise_on_missing_sensor,
+                )
+                log.to_csv(out_filepath)
+            except ParserError as e:
+                print(f"{e}, skipping directory")
+                continue
+
+            print("Done!")
