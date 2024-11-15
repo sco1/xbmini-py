@@ -1,5 +1,5 @@
 # xbmini-py
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/xbmini-py/0.3.0?logo=python&logoColor=FFD43B)](https://pypi.org/project/xbmini-py/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/xbmini-py/0.4.0?logo=python&logoColor=FFD43B)](https://pypi.org/project/xbmini-py/)
 [![PyPI](https://img.shields.io/pypi/v/xbmini-py)](https://pypi.org/project/xbmini-py/)
 [![PyPI - License](https://img.shields.io/pypi/l/xbmini-py?color=magenta)](https://github.com/sco1/xbmini-py/blob/master/LICENSE)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/sco1/xbmini-py/main.svg)](https://results.pre-commit.ci/latest/github/sco1/xbmini-py/main)
