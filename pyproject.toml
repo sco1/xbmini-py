@@ -25,7 +25,7 @@ classifiers = [
 requires-python = ">=3.11"
 dependencies = [
     "matplotlib-window~=1.0",
-    "pandas~=2.2",
+    "polars~=1.13",
     "sco1-misc~=0.1",
     "typer-slim~=0.12",
 ]

@@ -20,10 +20,9 @@ SAMPLE_LOG_FILE = """\
 
 # Generated manually from above log
 SAMPLE_LOG_FILE_PROCESSED = """\
-;{"drop_location": null, "drop_id": null, "_is_merged": false, "_is_trimmed": false, "_ground_pressure": 101325, "total_rigged_weight": null, "analysis_dt": 1705937161.423644, "drop_date": null, "header_info": {"n_header_lines": 12, "firmware_version": 2108, "serial": "ABC122345F0420", "header_spec": ["time", "accel_x", "accel_y", "accel_z", "gyro_x", "gyro_y", "gyro_z", "quat_w", "quat_x", "quat_y", "quat_z", "mag_x", "mag_y", "mag_z", "pressure", "temperature"], "logger_type": "HAM-IMU+alt", "sensors": {"Accel": {"name": "Accel", "sample_rate": 225, "sensitivity": 1000, "full_scale": 16, "units": "g"}, "Gyro": {"name": "Gyro", "sample_rate": 225, "sensitivity": 1, "full_scale": 250, "units": "dps"}, "Mag": {"name": "Mag", "sample_rate": 75, "sensitivity": 1, "full_scale": 4900000, "units": "nT"}}}}
+;{"drop_location": null, "drop_id": null, "_is_merged": false, "_is_trimmed": false, "_ground_pressure": 101325, "total_rigged_weight": null, "analysis_dt": 1731702483.543413, "drop_date": null, "header_info": {"n_header_lines": 12, "firmware_version": 2108, "serial": "ABC122345F0420", "header_spec": ["time", "accel_x", "accel_y", "accel_z", "gyro_x", "gyro_y", "gyro_z", "quat_w", "quat_x", "quat_y", "quat_z", "mag_x", "mag_y", "mag_z", "pressure", "temperature"], "logger_type": "HAM-IMU+alt", "sensors": {"Accel": {"name": "Accel", "sample_rate": 225, "sensitivity": 1000, "full_scale": 16, "units": "g"}, "Gyro": {"name": "Gyro", "sample_rate": 225, "sensitivity": 1, "full_scale": 250, "units": "dps"}, "Mag": {"name": "Mag", "sample_rate": 75, "sensitivity": 1, "full_scale": 4900000, "units": "nT"}}}}
 time,accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z,quat_w,quat_x,quat_y,quat_z,mag_x,mag_y,mag_z,total_accel,total_accel_rolling,pressure,temperature,press_alt_m,press_alt_ft
-
-0 days 00:00:00.010000,1.121,-0.015,0.024,-1.0,2.0,0.0,0.7826933821208445,-0.028024826981309012,-0.6205497403004138,-0.03903458043825184,7349.0,-68100.0,47099.0,1.1213572133802858,1.1213572133802858,98405,22.431,247.39859833055823,811.6653214028955
+0.01,1.121,-0.015,0.024,-1.0,2.0,0.0,0.7826933821208445,-0.028024826981309012,-0.6205497403004138,-0.03903458043825184,7349.0,-68100.0,47099.0,1.1213572133802858,1.1213572133802858,98405,22.431,247.39859833055823,811.6653214028955
 """
 
 SAMPLE_LOG_FILE_2 = """\

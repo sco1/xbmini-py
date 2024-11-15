@@ -1,6 +1,13 @@
 # Changelog
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (`<major>`.`<minor>`.`<patch>`)
 
+## [v0.5.0]
+### Changed
+* #37 Swap from pandas to polars dataframes for all parsed data outputs
+
+### Added
+* #35 Add support for GPS normalization when parsing raw log data
+
 ## [v0.4.0]
 ### Changed
 * Bump minimum Python version to 3.11
@@ -11,7 +18,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (`<ma
 * Add `matplotlib`-based log trimming helper
 
 ### Removed
-* #26, 29 Remove Plotly Dash-based trim application
+* #26, #29 Remove Plotly Dash-based trim application
 
 ## [v0.3.0]
 ### Changed
