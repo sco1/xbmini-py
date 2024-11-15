@@ -10,7 +10,7 @@ from collections import abc
 from dataclasses import InitVar, dataclass, field, fields
 from pathlib import Path
 
-import pandas as pd
+import polars as pl
 
 from xbmini import ParserError
 from xbmini.heading_parser import (
@@ -29,16 +29,15 @@ MINIMUM_SUPPORTED_FIRMWARE = 2108
 
 # Group sensors that require conversions for easier iteration
 SENSOR_GROUPS = {
-    "Accel": ["accel_x", "accel_y", "accel_z"],
-    "Gyro": ["gyro_x", "gyro_y", "gyro_z"],
-    "Mag": ["mag_x", "mag_y", "mag_z"],
-    "Quat": ["quat_x", "quat_y", "quat_z", "quat_w"],
+    "Accel": ("accel_x", "accel_y", "accel_z"),
+    "Gyro": ("gyro_x", "gyro_y", "gyro_z"),
+    "Mag": ("mag_x", "mag_y", "mag_z"),
+    "Quat": ("quat_x", "quat_y", "quat_z", "quat_w"),
 }
 
 # Group columns that we may want to look at separately
-# Pandas needs these as a list for indexing
-PRESS_TEMP_COLS = ["pressure", "temperature", "press_alt_m", "press_alt_ft"]
-GPS_COLS = [
+PRESS_TEMP_COLS = ("pressure", "temperature", "press_alt_m", "press_alt_ft")
+GPS_COLS = (
     "time_of_week",
     "latitude",
     "longitude",
@@ -47,41 +46,45 @@ GPS_COLS = [
     "hdop",
     "vdop",
     "utc_timestamp",
-]
+)
 
-ROLLING_WINDOW_WIDTH = "200ms"
+ROLLING_WINDOW_WIDTH = 200
 
 SKIP_STRINGS = ("processed", "trimmed", "combined")
 
 
 def _apply_sensitivity(
-    log_data: pd.DataFrame, sensor_info: SensorSpec, reverse: bool = False
-) -> pd.DataFrame:
+    log_data: pl.DataFrame, sensor_info: SensorSpec, reverse: bool = False
+) -> pl.DataFrame:
     for sensor_name, info in sensor_info.items():
         if not isinstance(info, SensorInfo):
             raise ValueError(
                 f"Sensor override for '{sensor_name}' must be an instance of SensorInfo. Received: '{type(info)}'"  # noqa: E501
             )
 
-        for col in SENSOR_GROUPS[sensor_name]:
-            if reverse:
-                log_data[col] = log_data[col] * info.sensitivity
-            else:
-                log_data[col] = log_data[col] / info.sensitivity
+        if reverse:
+            log_data = log_data.with_columns(pl.col(SENSOR_GROUPS[sensor_name]) * info.sensitivity)
+        else:
+            log_data = log_data.with_columns(pl.col(SENSOR_GROUPS[sensor_name]) / info.sensitivity)
 
     return log_data
 
 
-def _calculate_total_accel(log_data: pd.DataFrame, rolling_window_width: int | str) -> pd.DataFrame:
+def _calculate_total_accel(log_data: pl.DataFrame, rolling_window_width: int) -> pl.DataFrame:
     """
     Calculate total acceleration from the incoming accelerometer components.
 
     Total acceleration is calculated as both a direct vector sum as well as a vector sum of a
     rolling window of the specified width.
     """
-    log_data["total_accel"] = log_data[SENSOR_GROUPS["Accel"]].pow(2).sum(axis=1).pow(1 / 2)
-    log_data["total_accel_rolling"] = (
-        log_data["total_accel"].rolling(rolling_window_width, center=True).mean()
+    log_data = log_data.with_columns(
+        total_accel=pl.sum_horizontal(pl.col(SENSOR_GROUPS["Accel"]).pow(2)).pow(1 / 2)
+    )
+
+    log_data = log_data.with_columns(
+        total_accel_rolling=pl.col("total_accel").rolling_mean(
+            window_size=rolling_window_width, center=True, min_periods=0
+        )
     )
 
     return log_data
@@ -90,9 +93,9 @@ def _calculate_total_accel(log_data: pd.DataFrame, rolling_window_width: int | s
 def load_log(
     log_filepath: Path,
     sensitivity_override: SensorSpec | None = None,
-    rolling_window_width: int | str = ROLLING_WINDOW_WIDTH,
+    rolling_window_width: int = ROLLING_WINDOW_WIDTH,
     raise_on_missing_sensor: t.Literal[True, False] = True,
-) -> tuple[pd.DataFrame, HeaderInfo]:
+) -> tuple[pl.DataFrame, HeaderInfo]:
     """
     Load data from the provided XBM log file.
 
@@ -123,28 +126,29 @@ def load_log(
         raise_on_missing_sensor=raise_on_missing_sensor,
     )
 
-    full_data = pd.read_csv(
+    full_data = pl.read_csv(
         log_filepath,
-        skiprows=header_info.n_header_lines,
-        header=None,
-        names=header_info.header_spec,
-        index_col="time",
-        comment=";",
+        skip_rows=header_info.n_header_lines,
+        has_header=False,
+        new_columns=header_info.header_spec,
+        comment_prefix=";",
     )
+
+    # Some columns may have leading whitespace that needs to be trimmed in order for the schema to
+    # be correctly inferred. So far, the best approach I've figured out is this around-fuckery to
+    # dump the stripped columns as CSV and reload to infer the correct schema
+    full_data = full_data.with_columns(pl.selectors.string().str.strip_chars())
+    schema = pl.read_csv(full_data.head(1).write_csv().encode()).schema
+    full_data = full_data.cast(schema)  # type: ignore[arg-type]
 
     # For IMU-GPS, preserve UTC timestamp as a datetime instance
     if header_info.logger_type is LoggerType.IMU_GPS:
-        full_data["utc_timestamp"] = pd.to_datetime(full_data.index, unit="s", utc=True)
-
-    # Convert time index to timedelta so we can use rolling time windows later
-    full_data.index = pd.to_timedelta(full_data.index, unit="s")
-
-    # Not sure how prevalent it ends up being but there are some instances where the time ends up
-    # not being monotonic, ensure the index is sorted just in case
-    full_data.sort_index(inplace=True)
+        full_data = full_data.with_columns(
+            utc_timestamp=pl.from_epoch(pl.col("time"), time_unit="s").dt.replace_time_zone("UTC")
+        )
 
     # Temperature is always recorded as milli-degree Celsius
-    full_data["temperature"] = full_data["temperature"] / 1000
+    full_data = full_data.with_columns(temperature=pl.col("temperature") / 1000)
 
     if header_info.logger_type is not LoggerType.IMU_GPS:
         # Convert measurements from raw counts to measured values
@@ -161,34 +165,39 @@ def load_log(
 
         # Convert quaternion data, incoming as 16bit values, then normalize with RMS
         # IMU-GPS devices do not log quaternions
-        quat_cols = SENSOR_GROUPS["Quat"]
-        full_data[quat_cols] = full_data[quat_cols] / 65536
-        q_rms = full_data[quat_cols].pow(2).sum(axis=1).pow(1 / 2)
-        for col in quat_cols:
-            # Not sure what the magic pandas invocation is do do this without a loop
-            full_data[col] = full_data[col] / q_rms
+        quat_c = SENSOR_GROUPS["Quat"]
+        full_data = full_data.with_columns(pl.col(quat_c) / 65536)
+        q_rms = pl.sum_horizontal(pl.col(quat_c).pow(2)).pow(1 / 2)
+        full_data = full_data.with_columns(pl.col(quat_c) / q_rms)
     elif header_info.logger_type is LoggerType.IMU_GPS:  # pragma: no branch
         # IMU-GPS devices always record acceleration in milli-gees & gyro in milli-dps
-        for col in SENSOR_GROUPS["Accel"]:
-            full_data[col] = full_data[col] / 1000
-
-        for col in SENSOR_GROUPS["Gyro"]:
-            full_data[col] = full_data[col] / 1000
+        full_data = full_data.with_columns(
+            (pl.col(SENSOR_GROUPS["Accel"]) / 1000),
+            (pl.col(SENSOR_GROUPS["Gyro"]) / 1000),
+        )
 
     full_data = _calculate_total_accel(full_data, rolling_window_width)
 
     return full_data, header_info
 
 
-def _split_cols(log_df: pd.DataFrame, columns: t.List[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
+def _split_cols(
+    log_df: pl.DataFrame, columns: t.Iterable[str]
+) -> tuple[pl.DataFrame, pl.DataFrame]:
     """
     Split off the specified column(s) into their own dataframe & drop from original.
 
     The columns are dropped from the incoming `DataFrame`, and the modified dataframe is returned.
     """
     # Only try to index & drop the columns that exist (e.g. press_alt_ft might not exist yet)
-    split_cols = log_df[log_df.columns.intersection(columns)].dropna(axis=0)
-    log_df = log_df.drop(columns, axis=1, errors="ignore")
+    exist_cols = set(log_df.columns).intersection(columns)
+
+    # Move back to a list to ensure time is first column
+    select_cols = ["time"]
+    select_cols.extend(exist_cols)
+
+    split_cols = log_df.select(select_cols).drop_nulls()
+    log_df = log_df.drop(columns, strict=False)
 
     return split_cols, log_df
 
@@ -196,10 +205,10 @@ def _split_cols(log_df: pd.DataFrame, columns: t.List[str]) -> tuple[pd.DataFram
 @dataclass(slots=True)
 class XBMLog:  # noqa: D101
     header_info: HeaderInfo
-    log_data: InitVar[pd.DataFrame]
-    mpu: pd.DataFrame = field(init=False)
-    press_temp: pd.DataFrame = field(init=False)
-    gps: pd.DataFrame | None = field(init=False)
+    log_data: InitVar[pl.DataFrame]
+    mpu: pl.DataFrame = field(init=False)
+    press_temp: pl.DataFrame = field(init=False)
+    gps: pl.DataFrame | None = field(init=False)
     drop_date: dt.date | None = None
     drop_location: str | None = None
     drop_id: str | None = None
@@ -223,7 +232,7 @@ class XBMLog:  # noqa: D101
         )
     )
 
-    def __post_init__(self, log_data: pd.DataFrame) -> None:
+    def __post_init__(self, log_data: pl.DataFrame) -> None:
         # Split out pressure/temperature data & GPS, if available
         press_temp, mpu_data = _split_cols(log_data, columns=PRESS_TEMP_COLS)
         self.press_temp = press_temp
@@ -240,10 +249,13 @@ class XBMLog:  # noqa: D101
         self._calculate_pressure_altitude()
 
     def _calculate_pressure_altitude(self) -> None:
-        self.press_temp["press_alt_m"] = 44_330 * (
-            1 - (self.press_temp["pressure"] / self.ground_pressure).pow(1 / 5.225)
+        pt = self.press_temp
+        pt = pt.with_columns(
+            press_alt_m=44_330 * (1 - (pl.col("pressure") / self.ground_pressure).pow(1 / 5.225))
         )
-        self.press_temp["press_alt_ft"] = self.press_temp["press_alt_m"] * 3.2808
+        pt = pt.with_columns(press_alt_ft=pl.col("press_alt_m") * 3.2808)
+
+        self.press_temp = pt
 
     @property
     def logger_id(self) -> str:  # noqa: D102  # pragma: no cover
@@ -260,8 +272,12 @@ class XBMLog:  # noqa: D101
         self._calculate_pressure_altitude()
 
     @property
-    def _full_dataframe(self) -> pd.DataFrame:
-        return pd.concat((self.mpu, self.press_temp, self.gps), axis=1)
+    def _full_dataframe(self) -> pl.DataFrame:
+        joined = self.mpu.join(self.press_temp, on="time", how="full", coalesce=True)
+        if self.gps is not None:
+            joined = joined.join(self.gps, on="time", how="full", coalesce=True)
+
+        return joined
 
     def _serialize_metadata(self) -> str:
         """Dump the instance into a serializable dictionary."""
@@ -304,7 +320,7 @@ class XBMLog:  # noqa: D101
 
         # Explicitly specify terminator to prevent extra newlines on Windows when the buffer is
         # dumped
-        full_data.to_csv(buff, lineterminator="\n")
+        full_data.write_csv(buff, line_terminator="\n")
 
         return buff.getvalue()
 
@@ -335,11 +351,13 @@ class XBMLog:  # noqa: D101
             ]
 
         if normalize_time:
-            self.mpu.index = self.mpu.index - self.mpu.index[0]
-            self.press_temp.index = self.press_temp.index - self.press_temp.index[0]
+            self.mpu = self.mpu.with_columns(time=pl.col("time") - self.mpu["time"][0])
+            self.press_temp = self.press_temp.with_columns(
+                time=pl.col("time") - self.press_temp["time"][0]
+            )
 
             if self.gps is not None:
-                self.gps.index = self.gps.index - self.gps.index[0]
+                self.gps = self.gps.with_columns(time=pl.col("time") - self.gps["time"][0])
 
         self._is_trimmed = True
 
@@ -348,7 +366,7 @@ class XBMLog:  # noqa: D101
         cls,
         log_filepath: Path,
         sensitivity_override: SensorSpec | None = None,
-        rolling_window_width: int | str = ROLLING_WINDOW_WIDTH,
+        rolling_window_width: int = ROLLING_WINDOW_WIDTH,
         normalize_time: bool = False,
         raise_on_missing_sensor: t.Literal[True, False] = True,
     ) -> XBMLog:
@@ -380,7 +398,7 @@ class XBMLog:  # noqa: D101
         cls,
         log_filepaths: t.Sequence[Path],
         sensitivity_override: SensorSpec | None = None,
-        rolling_window_width: int | str = ROLLING_WINDOW_WIDTH,
+        rolling_window_width: int = ROLLING_WINDOW_WIDTH,
         normalize_time: bool = False,
         raise_on_missing_sensor: t.Literal[True, False] = True,
     ) -> XBMLog:
@@ -400,7 +418,7 @@ class XBMLog:  # noqa: D101
         """
         # Grab the header info from the first file so we don't have to worry in the list comp
         header_info = parse_header(extract_header(log_filepaths[0]))
-        full_data = pd.concat(
+        full_data = pl.concat(
             [
                 # Skip the header info since we've already grabbed it
                 load_log(
@@ -414,7 +432,7 @@ class XBMLog:  # noqa: D101
         )
 
         if normalize_time:
-            full_data.index = full_data.index - full_data.index[0]
+            full_data = full_data.with_columns(time=pl.col("time") - full_data["time"][0])
 
         return cls(
             header_info=header_info,
@@ -428,7 +446,7 @@ class XBMLog:  # noqa: D101
         in_log: Path | io.StringIO,
         header_prefix: str = DEFAULT_HEADER_PREFIX,
         sensitivity_override: SensorSpec | None = None,
-        rolling_window_width: int | str = ROLLING_WINDOW_WIDTH,
+        rolling_window_width: int = ROLLING_WINDOW_WIDTH,
     ) -> XBMLog:
         """
         Rebuild a class instance from the provided CSV filepath.
@@ -443,14 +461,13 @@ class XBMLog:  # noqa: D101
         NOTE: Rolling window values are always recalculated during the loading process.
         """
         if isinstance(in_log, Path):
-            with in_log.open("r") as f:
+            with in_log.open("r", encoding="utf-8") as f:
                 metadata_header = f.readline().lstrip(header_prefix).strip()
-                full_data = pd.read_csv(f, index_col=0)
+                full_data = pl.read_csv(f)
         elif isinstance(in_log, io.StringIO):  # pragma: no branch
             metadata_header = in_log.readline().lstrip(header_prefix).strip()
-            full_data = pd.read_csv(in_log, index_col=0)
+            full_data = pl.read_csv(in_log)
 
-        full_data.index = pd.to_timedelta(full_data.index)
         metadata = cls._deserialize_metadata(metadata_header)
 
         if sensitivity_override is not None:

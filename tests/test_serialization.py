@@ -2,8 +2,9 @@ import io
 from dataclasses import fields
 from pathlib import Path
 
-import pandas as pd
+import polars as pl
 import pytest
+from polars.testing import assert_frame_equal
 
 from xbmini.heading_parser import HeaderInfo, LoggerType, SensorInfo, SensorSpec
 from xbmini.log_parser import XBMLog
@@ -76,8 +77,10 @@ def test_xbm_csv_roundtrip(tmp_log: Path) -> None:
     # Will throw warnings about ambiguous DF comparisons otherwise
     test_log = XBMLog.from_processed_csv(tmp_csv)
     for field in fields(log):
-        if isinstance(getattr(test_log, field.name), pd.DataFrame):
-            pd.testing.assert_frame_equal(getattr(log, field.name), getattr(test_log, field.name))
+        if isinstance(getattr(test_log, field.name), pl.DataFrame):
+            assert_frame_equal(
+                getattr(log, field.name), getattr(test_log, field.name), check_column_order=False
+            )
         else:
             assert getattr(log, field.name) == getattr(test_log, field.name)
 
@@ -92,7 +95,9 @@ def test_xbm_stringio_roundtrip(tmp_log: Path) -> None:
     # Will throw warnings about ambiguous DF comparisons otherwise
     test_log = XBMLog.from_processed_csv(buff)
     for field in fields(log):
-        if isinstance(getattr(test_log, field.name), pd.DataFrame):
-            pd.testing.assert_frame_equal(getattr(log, field.name), getattr(test_log, field.name))
+        if isinstance(getattr(test_log, field.name), pl.DataFrame):
+            assert_frame_equal(
+                getattr(log, field.name), getattr(test_log, field.name), check_column_order=False
+            )
         else:
             assert getattr(log, field.name) == getattr(test_log, field.name)
