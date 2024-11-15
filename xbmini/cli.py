@@ -9,18 +9,16 @@ from xbmini.trim import windowtrim_log_file
 
 xbmini_cli = typer.Typer(add_completion=False, no_args_is_help=True)
 
-merge_cli = typer.Typer(add_completion=False)
-xbmini_cli.add_typer(merge_cli, name="merge", help="XBMini log merging.")
-
 trim_cli = typer.Typer(add_completion=False)
 xbmini_cli.add_typer(trim_cli, name="trim", help="XBMini log trimming.")
 
 
-@merge_cli.command(name="batch", short_help="Batch combine multiple log sessions.")
+@xbmini_cli.command(name="merge", short_help="Combine multiple log sessions.")
 def batch_combine(
     top_dir: Path = typer.Option(None, exists=True, file_okay=False),
-    log_pattern: str = typer.Option("*.CSV"),
-    dry_run: bool = typer.Option(False),
+    log_pattern: str = "*.CSV",
+    bin_sessions: bool = True,
+    dry_run: bool = False,
     # Typer can't handle sets or arbitrary length tuples so we'll just hint as a list
     skip_strs: list[str] = log_parser.SKIP_STRINGS,  # type: ignore[assignment]
 ) -> None:
@@ -49,6 +47,7 @@ def batch_combine(
         pattern=log_pattern,
         dry_run=dry_run,
         skip_strs=skip_strs,
+        bin_sessions=bin_sessions,
     )
 
 

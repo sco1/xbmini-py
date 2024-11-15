@@ -8,6 +8,8 @@ from dataclasses import asdict, dataclass, fields
 from enum import Enum
 from pathlib import Path
 
+from xbmini import ParserError
+
 DEFAULT_HEADER_PREFIX = ";"
 IMU_SENSORS = ("Accel", "Gyro", "Mag")
 
@@ -38,10 +40,6 @@ HEADER_MAP = {
 }
 
 VER_SN_RE = re.compile(r"Version,\s+(\d+)[\w\s,]+SN:(\w+)")
-
-
-class ParserError(RuntimeError):  # noqa: D101
-    ...
 
 
 class LoggerType(Enum):  # noqa: D101

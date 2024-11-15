@@ -4,9 +4,14 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (`<ma
 ## [v0.4.0]
 ### Changed
 * Bump minimum Python version to 3.11
-* #26 Make `dash` an optional install; to use the interactive trimming app, use `trimapp` extras to install required components
-* #26 Hide `dash` trimming app from CLI interface if dependencies are not installed
+* (Internal) Migrate to uv from poetry
+* #34 `xbmini.log_parser.batch_combine` now defaults to attempting to separate logging sessions before combining
+
+### Added
 * Add `matplotlib`-based log trimming helper
+
+### Removed
+* #26, 29 Remove Plotly Dash-based trim application
 
 ## [v0.3.0]
 ### Changed

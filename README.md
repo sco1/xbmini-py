@@ -33,7 +33,7 @@ Options:
   --help  Show this message and exit.
 
 Commands:
-  merge  XBMini log merging.
+  merge  Combine multiple log sessions.
   trim   XBMini log trimming.
 ```
 <!-- [[[end]]] -->
