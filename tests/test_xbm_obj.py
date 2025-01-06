@@ -27,6 +27,12 @@ def test_gps_data_split(tmp_log_gps: Path) -> None:
     assert set(log_obj.gps.columns) == {"time", *GPS_COLS}
 
 
+def test_gps_normalize(tmp_log_gps: Path) -> None:
+    log_obj = XBMLog.from_raw_log_file(tmp_log_gps, normalize_gps=True)
+    assert log_obj.gps["latitude"][0] == pytest.approx(0)  # type: ignore[index]
+    assert log_obj.gps["longitude"][0] == pytest.approx(0)  # type: ignore[index]
+
+
 def test_xbm_from_multi(tmp_multi_log: list[Path]) -> None:
     log_obj = XBMLog.from_multi_raw_log(tmp_multi_log)
 

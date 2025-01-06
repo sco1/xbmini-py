@@ -397,8 +397,9 @@ class XBMLog:  # noqa: D101
         log_filepath: Path,
         sensitivity_override: SensorSpec | None = None,
         rolling_window_width: int = ROLLING_WINDOW_WIDTH,
-        normalize_time: bool = False,
         raise_on_missing_sensor: t.Literal[True, False] = True,
+        normalize_time: bool = False,
+        normalize_gps: bool = False,
     ) -> XBMLog:
         """
         Build a log instance from the provided log file.
@@ -416,8 +417,9 @@ class XBMLog:  # noqa: D101
             log_filepaths=(log_filepath,),
             sensitivity_override=sensitivity_override,
             rolling_window_width=rolling_window_width,
-            normalize_time=normalize_time,
             raise_on_missing_sensor=raise_on_missing_sensor,
+            normalize_time=normalize_time,
+            normalize_gps=normalize_gps,
         )
         log._is_merged = False
 
@@ -429,8 +431,9 @@ class XBMLog:  # noqa: D101
         log_filepaths: t.Sequence[Path],
         sensitivity_override: SensorSpec | None = None,
         rolling_window_width: int = ROLLING_WINDOW_WIDTH,
-        normalize_time: bool = False,
         raise_on_missing_sensor: t.Literal[True, False] = True,
+        normalize_time: bool = False,
+        normalize_gps: bool = False,
     ) -> XBMLog:
         """
         Build a log instance by joining the provided log files.
@@ -463,6 +466,15 @@ class XBMLog:  # noqa: D101
 
         if normalize_time:
             full_data = full_data.with_columns(time=pl.col("time") - full_data["time"][0])
+
+        if normalize_gps:
+            if header_info.logger_type == LoggerType.IMU_GPS:
+                full_data = full_data.with_columns(
+                    latitude=pl.col("latitude") - full_data["latitude"][0],
+                    longitude=pl.col("longitude") - full_data["longitude"][0],
+                )
+            else:
+                print("GPS data not expected for inferred device type, skipping normalization ...")
 
         return cls(
             header_info=header_info,
