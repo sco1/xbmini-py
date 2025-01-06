@@ -7,6 +7,7 @@ from xbmini.log_parser import XBMLog
 
 def windowtrim_log_file(
     log_filepath: Path,
+    normalize_time: bool = True,
     write_csv: bool = False,
 ) -> XBMLog:
     """
@@ -18,11 +19,11 @@ def windowtrim_log_file(
     """
     log_data = XBMLog.from_raw_log_file(log_filepath)
 
-    xdata = log_data.press_temp.index
+    xdata = log_data.press_temp["time"]
     ydata = log_data.press_temp["press_alt_ft"]
     l_bound, r_bound = flexible_window(x_data=xdata, y_data=ydata, position=10, window_width=20)
 
-    log_data.trim_log(l_bound, r_bound)
+    log_data.trim_log(l_bound, r_bound, normalize_time=normalize_time)
 
     if write_csv:
         out_filepath = log_filepath.with_stem(f"{log_filepath.stem}_trimmed")

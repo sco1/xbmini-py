@@ -69,3 +69,24 @@ def test_press_alt_update(log_file_data: LOG_FILE_DATA_T) -> None:
     assert log_obj.ground_pressure == 100_000
     assert log_obj.press_temp["press_alt_m"][0] == pytest.approx(136.20, abs=1e-2)
     assert log_obj.press_temp["press_alt_ft"][0] == pytest.approx(446.86, abs=1e-2)
+
+
+def test_get_idx_imu(tmp_log_multi_sample: Path) -> None:
+    log_obj = XBMLog.from_raw_log_file(tmp_log_multi_sample, normalize_time=True)
+
+    indices = log_obj._get_idx(0.01)
+    assert indices == (1, 1, None)
+
+
+def test_get_idx_imu_gps(tmp_log_gps_multi_sample: Path) -> None:
+    log_obj = XBMLog.from_raw_log_file(tmp_log_gps_multi_sample, normalize_time=True)
+
+    indices = log_obj._get_idx(0.01)
+    assert indices == (1, 1, 1)
+
+
+def test_get_idx_bad_col_raises(tmp_log_multi_sample: Path) -> None:
+    log_obj = XBMLog.from_raw_log_file(tmp_log_multi_sample, normalize_time=True)
+
+    with pytest.raises(ValueError, match="does not contain column 'foo'"):
+        _ = log_obj._get_idx(0.01, ref_col="foo")

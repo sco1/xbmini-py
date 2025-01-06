@@ -202,6 +202,12 @@ def _split_cols(
     return split_cols, log_df
 
 
+class DataIndices(t.NamedTuple):  # noqa: D101
+    mpu: int
+    press_temp: int
+    gps: int | None
+
+
 @dataclass(slots=True)
 class XBMLog:  # noqa: D101
     header_info: HeaderInfo
@@ -324,31 +330,55 @@ class XBMLog:  # noqa: D101
 
         return buff.getvalue()
 
+    def _get_idx(self, query: NUMERIC_T, ref_col: str = "time") -> DataIndices:
+        """
+        Return the first index of the data in `ref_col` closest to the provided `query` value.
+
+        Indices are calculated for each component dataframe of the parsed log.
+        """
+        subframes: tuple[pl.DataFrame, ...]
+        if self.gps is None:
+            subframes = (self.mpu, self.press_temp)
+        else:
+            subframes = (self.mpu, self.press_temp, self.gps)
+
+        idx = []
+        for sf in subframes:
+            if ref_col not in set(sf.columns):
+                raise ValueError(f"Log data does not contain column '{ref_col}'")
+
+            delta = (sf[ref_col] - query).abs()
+            min_idx = delta.arg_min()
+
+            if min_idx is None:  # pragma: no cover
+                # Not sure how to actually get here in real life
+                raise ValueError(f"Could not locate value, is the '{ref_col}' column empty?")
+
+            idx.append(min_idx)
+
+        if self.gps is None:
+            return DataIndices(*idx, None)  # type: ignore[call-arg]
+        else:
+            return DataIndices(*idx)
+
     def trim_log(
         self,
-        elapsed_start: float | dt.timedelta,
-        elapsed_end: float | dt.timedelta,
+        elapsed_start: float,
+        elapsed_end: float,
         normalize_time: bool = True,
     ) -> None:
         """
         Trim the log dataframes between the provided start & end times.
 
-        The `normalize_time` flag may be set to normalize the time index so it starts at 0 seconds,
-        helping for cases where the XBM starts at some abnormally large time index.
+        The `normalize_time` flag may be set to normalize the time index so it starts at 0 seconds.
         """
-        if not isinstance(elapsed_start, dt.timedelta):
-            elapsed_start = dt.timedelta(seconds=elapsed_start)
-        if not isinstance(elapsed_end, dt.timedelta):
-            elapsed_end = dt.timedelta(seconds=elapsed_end)
+        start_idx = self._get_idx(elapsed_start)
+        end_idx = self._get_idx(elapsed_end)
 
-        self.mpu = self.mpu.loc[(self.mpu.index >= elapsed_start) & (self.mpu.index <= elapsed_end)]
-        self.press_temp = self.press_temp.loc[
-            (self.press_temp.index >= elapsed_start) & (self.press_temp.index <= elapsed_end)
-        ]
+        self.mpu = self.mpu[start_idx.mpu : end_idx.mpu + 1]
+        self.press_temp = self.press_temp[start_idx.press_temp : end_idx.press_temp + 1]
         if self.gps is not None:
-            self.gps = self.gps.loc[
-                (self.gps.index >= elapsed_start) & (self.gps.index <= elapsed_end)
-            ]
+            self.gps = self.gps[start_idx.gps : end_idx.gps + 1]  # type: ignore[operator]
 
         if normalize_time:
             self.mpu = self.mpu.with_columns(time=pl.col("time") - self.mpu["time"][0])

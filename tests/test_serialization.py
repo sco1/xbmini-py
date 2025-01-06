@@ -6,6 +6,7 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
+from tests.conftest import TRUTH_DF, TRUTH_DF_GPS
 from xbmini.heading_parser import HeaderInfo, LoggerType, SensorInfo, SensorSpec
 from xbmini.log_parser import XBMLog
 
@@ -101,3 +102,27 @@ def test_xbm_stringio_roundtrip(tmp_log: Path) -> None:
             )
         else:
             assert getattr(log, field.name) == getattr(test_log, field.name)
+
+
+def test_xbm_data_join(tmp_log: Path) -> None:
+    log = XBMLog.from_raw_log_file(tmp_log)
+    joined_df = log._full_dataframe
+
+    # Check that derived quantities are present (calc tested elsewhere) then remove for comparison
+    assert "press_alt_m" in joined_df.columns
+    assert "press_alt_ft" in joined_df.columns
+    joined_df = joined_df.drop(("press_alt_m", "press_alt_ft"))
+
+    assert_frame_equal(joined_df, TRUTH_DF, check_column_order=False)
+
+
+def test_xbm_gps_data_join(tmp_log_gps: Path) -> None:
+    log = XBMLog.from_raw_log_file(tmp_log_gps)
+    joined_df = log._full_dataframe
+
+    # Check that derived quantities are present (calc tested elsewhere) then remove for comparison
+    assert "press_alt_m" in joined_df.columns
+    assert "press_alt_ft" in joined_df.columns
+    joined_df = joined_df.drop(("press_alt_m", "press_alt_ft"))
+
+    assert_frame_equal(joined_df, TRUTH_DF_GPS, check_column_order=False)
