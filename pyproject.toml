@@ -1,6 +1,6 @@
 [project]
 name = "xbmini-py"
-version = "0.4.0"
+version = "0.5.0"
 description = "Python Toolkit for the GCDC HAM"
 authors = [
     {name = "sco1", email = "sco1.git@gmail.com"}
@@ -25,7 +25,7 @@ classifiers = [
 requires-python = ">=3.11"
 dependencies = [
     "matplotlib-window~=1.0",
-    "pandas~=2.2",
+    "polars~=1.13",
     "sco1-misc~=0.1",
     "typer-slim~=0.12",
 ]
