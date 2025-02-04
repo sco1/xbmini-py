@@ -24,8 +24,8 @@ classifiers = [
 
 requires-python = ">=3.11"
 dependencies = [
-    "matplotlib-window~=1.0",
-    "polars~=1.13",
+    "matplotlib-window~=1.1",
+    "polars~=1.21",
     "sco1-misc~=0.1",
     "typer-slim~=0.12",
 ]
@@ -42,11 +42,11 @@ xbmini = "xbmini.cli:xbmini_cli"
 
 [tool.uv]
 dev-dependencies = [
-    "black~=24.8",
+    "black~=25.0",
     "cogapp~=3.3",
     "flake8~=7.1",
     "flake8-annotations~=3.1",
-    "isort~=5.13",
+    "isort~=6.0",
     "mypy~=1.11",
     "pre-commit~=4.0",
     "pytest~=8.3",
