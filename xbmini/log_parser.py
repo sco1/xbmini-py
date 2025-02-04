@@ -83,7 +83,7 @@ def _calculate_total_accel(log_data: pl.DataFrame, rolling_window_width: int) ->
 
     log_data = log_data.with_columns(
         total_accel_rolling=pl.col("total_accel").rolling_mean(
-            window_size=rolling_window_width, center=True, min_periods=0
+            window_size=rolling_window_width, center=True, min_samples=0
         )
     )
 
