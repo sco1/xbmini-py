@@ -152,3 +152,38 @@ def test_load_processed_new_override(tmp_proc_log: Path) -> None:
     df = df.drop(("press_alt_m", "press_alt_ft"))  # Derived quantities & not relevant here
 
     assert_frame_equal(df, TRUTH_DF_SENS_OVERRIDE, check_exact=False, check_column_order=False)
+
+
+SAMPLE_GPS_LOG_SHORT_FIRST_ROW = """\
+;Title, http://www.gcdataconcepts.com, LSM6DSM, BMP384, GPS
+;Version, 2570, Build date, Jan  1 2022,  SN:ABC122345F0420
+;Start_time, 2022-09-26, 08:13:29.030
+;Uptime, 6,sec,  Vbat, 4198, mv, EOL, 3500, mv
+;Deadband, 0, counts
+;DeadbandTimeout, 0.000,sec
+;BMP384, SI, 0.100,sec, Units, Pa, mdegC
+;Alt Trigger disabled
+;LSM6DSM, SR,104,Hz, Units, mG, mdps, fullscale gyro 250dps, accel 4g
+;Magnetometer, SR,10,Hz, Units, nT, Temperature, 19,degC
+;CAM_M8 Gps, SR,1,Hz
+;Gps Sats, TOW, 123456789, ver, 1, numSat, 13
+;, gnssId, svId, cno, elev, azmith, prRes, flags,inUse
+;, GPS , 001, 26, 23, 219, 0, 0x00001213
+;, GPS , 002, 33, 65, 318, 0, 0x00001213
+;, GPS , 003, 00, 35, 298, 0, 0x00001211
+;, GPS , 004, 00, 04, 283, 0, 0x00001211
+;, GPS , 005, 00, 29, 151, 0, 0x00001211
+;, GPS , 006, 00, 20, 210, 0, 0x00001911
+;, GPS , 007, 00, 46, 121, 0, 0x00001911
+;, GPS , 008, 00, 35, 043, 0, 0x00001211
+;Time, Ax, Ay, Az, Gx, Gy, Gz, Mx, My, Mz, P, T, TOW, Lat,Lon, Height(m), MSL(m), hdop(m), vdop(m)
+9433200.0,100,100,100,200,200,200,300,300,300,100000,20000,
+9433200.1,100,100,100,200,200,200,300,300,300,100000,20000, 300000.6, 33.6571,-117.7462, 429.0, 457.0, 1.0,2.0
+"""
+
+
+def test_log_load_short_first_row(tmp_path: Path) -> None:
+    tmp_log = tmp_path / "log.CSV"
+    tmp_log.write_text(SAMPLE_GPS_LOG_SHORT_FIRST_ROW)
+
+    _ = load_log(tmp_log)
