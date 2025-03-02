@@ -1,6 +1,10 @@
 # Changelog
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (`<major>`.`<minor>`.`<patch>`)
 
+## [v0.5.1]
+### Fixed
+* #43 Fixed parsing error for logs whose first data row is incomplete
+
 ## [v0.5.0]
 ### Changed
 * #37 Swap from pandas to polars dataframes for all parsed data outputs

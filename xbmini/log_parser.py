@@ -90,6 +90,33 @@ def _calculate_total_accel(log_data: pl.DataFrame, rolling_window_width: int) ->
     return log_data
 
 
+DTYPE_MAPPING = {
+    "time": pl.Float64,
+    "accel_x": pl.Int64,
+    "accel_y": pl.Int64,
+    "accel_z": pl.Int64,
+    "gyro_x": pl.Int64,
+    "gyro_y": pl.Int64,
+    "gyro_z": pl.Int64,
+    "quat_w": pl.Float64,
+    "quat_x": pl.Float64,
+    "quat_y": pl.Float64,
+    "quat_z": pl.Float64,
+    "mag_x": pl.Int64,
+    "mag_y": pl.Int64,
+    "mag_z": pl.Int64,
+    "pressure": pl.Int64,
+    "temperature": pl.Int64,
+    "time_of_week": pl.Float64,
+    "latitude": pl.Float64,
+    "longitude": pl.Float64,
+    "height_ellipsoid": pl.Float64,
+    "height_msl": pl.Float64,
+    "hdop": pl.Float64,
+    "vdop": pl.Float64,
+}
+
+
 def load_log(
     log_filepath: Path,
     sensitivity_override: SensorSpec | None = None,
@@ -126,20 +153,21 @@ def load_log(
         raise_on_missing_sensor=raise_on_missing_sensor,
     )
 
+    # In some instances, usually when a log is continuing into a new file, the first row may not
+    # have all columns present which causes Polars to raise an exception while parsing. Predefining
+    # the data schema using the parsed column headers appears to resolve the issue and allows for
+    # generic handling of the data columns, which vary by hardware type (e.g. IMU-GPS does not have
+    # quaternions)
+    schema = {c: DTYPE_MAPPING[c] for c in header_info.header_spec}
+
     full_data = pl.read_csv(
         log_filepath,
         skip_rows=header_info.n_header_lines,
         has_header=False,
         new_columns=header_info.header_spec,
         comment_prefix=";",
+        schema=schema,
     )
-
-    # Some columns may have leading whitespace that needs to be trimmed in order for the schema to
-    # be correctly inferred. So far, the best approach I've figured out is this around-fuckery to
-    # dump the stripped columns as CSV and reload to infer the correct schema
-    full_data = full_data.with_columns(pl.selectors.string().str.strip_chars())
-    schema = pl.read_csv(full_data.head(1).write_csv().encode()).schema
-    full_data = full_data.cast(schema)  # type: ignore[arg-type]
 
     # For IMU-GPS, preserve UTC timestamp as a datetime instance
     if header_info.logger_type is LoggerType.IMU_GPS:
