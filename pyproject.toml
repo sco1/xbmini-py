@@ -2,10 +2,9 @@
 name = "xbmini-py"
 version = "0.5.1"
 description = "Python Toolkit for the GCDC HAM"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
-    {name = "sco1", email = "sco1.git@gmail.com"}
-]
-maintainers = [
     {name = "sco1", email = "sco1.git@gmail.com"}
 ]
 
@@ -13,7 +12,6 @@ readme = "README.md"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.11",
@@ -33,7 +31,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/sco1/"
 Documentation = "https://github.com/sco1/xbmini-py/blob/main/README.md"
-Repository = "https://github.com/sco1/xbmini-py"
+Repository = "https://github.com/sco1/xbmini-py.git"
 Issues = "https://github.com/sco1/xbmini-py/issues"
 Changelog = "https://github.com/sco1/xbmini-py/blob/main/CHANGELOG.md"
 
