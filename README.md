@@ -1,4 +1,5 @@
 # xbmini-py
+
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/xbmini-py/0.5.1?logo=python&logoColor=FFD43B)](https://pypi.org/project/xbmini-py/)
 [![PyPI](https://img.shields.io/pypi/v/xbmini-py)](https://pypi.org/project/xbmini-py/)
 [![PyPI - License](https://img.shields.io/pypi/l/xbmini-py?color=magenta)](https://github.com/sco1/xbmini-py/blob/master/LICENSE)
@@ -7,12 +8,14 @@
 Python Toolkit for the [GCDC HAM](http://www.gcdataconcepts.com/ham.html)
 
 ## Known Firmware Compatibility
+
 This package is currently tested against firmware versions `1379`, `2108`, and `2570`, compatibility with other firmware versions is not guaranteed.
 
 ## Installation
+
 Install from PyPi with your favorite `pip` invocation:
 
-```bash
+```text
 $ pip install xbmini-py
 ```
 
@@ -22,10 +25,11 @@ import cog
 from subprocess import PIPE, run
 out = run(["xbmini", "--help"], stdout=PIPE, encoding="ascii")
 cog.out(
-    f"```\n$ xbmini --help\n{out.stdout.rstrip()}\n```"
+    f"\n```bash\n$ xbmini --help\n{out.stdout.rstrip()}\n```\n\n"
 )
 ]]] -->
-```
+
+```bash
 $ xbmini --help
 Usage: xbmini [OPTIONS] COMMAND [ARGS]...
 
@@ -36,12 +40,17 @@ Commands:
   merge  Combine multiple log sessions.
   trim   XBMini log trimming.
 ```
+
 <!-- [[[end]]] -->
 
 ## CLI Usage
+
 ### `xbmini merge batch`
+
 Batch combine XBM files for each logger and dump a serialized `XBMLog` instance to a CSV in its respective logger's directory.
+
 #### Input Parameters
+
 | Parameter       | Description                                            | Type         | Default                                |
 |-----------------|--------------------------------------------------------|--------------|----------------------------------------|
 | `--top-dir`     | Path to top-level log directory to search.<sup>1</sup> | `Path\|None` | GUI Prompt                             |

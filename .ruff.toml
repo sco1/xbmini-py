@@ -9,11 +9,14 @@ extend-exclude = [
 
 [lint]
 select = [
-    "B",  # flake8-bugbear
-    "C4",  # flake8-comprehensions
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "D",    # pydocstyle/flake8-docstrings
+    "E",    # pycodestyle
+    "F",    # Pyflakes
     "FIX",  # flake8-fixme
-    "D",  # pydocstyle/flake8-docstrings
-    "N",  # pep8-naming
+    "N",    # pep8-naming
+    "W",    # pycodestyle
 ]
 
 ignore = [
@@ -53,9 +56,11 @@ ignore = [
 "tests/test_*.py" = [
     "D101",
     "D103",
+    "E501",
 ]
 "conftest.py" = [
     "D103",
+    "E501",
 ]
 
 [lint.flake8-bugbear]
