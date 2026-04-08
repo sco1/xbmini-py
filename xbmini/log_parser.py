@@ -162,7 +162,7 @@ def load_log(
 
     full_data = pl.read_csv(
         log_filepath,
-        skip_rows=header_info.n_header_lines,
+        skip_lines=header_info.n_header_lines,
         has_header=False,
         new_columns=header_info.header_spec,
         comment_prefix=";",
