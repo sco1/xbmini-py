@@ -23,7 +23,7 @@ You can confirm proper installation via the `xbmini` CLI:
 <!-- [[[cog
 import cog
 from subprocess import PIPE, run
-out = run(["xbmini", "--help"], stdout=PIPE, encoding="ascii")
+out = run(["xbmini", "--help"], stdout=PIPE, encoding="ascii", env={"TYPER_USE_RICH": "0"})
 cog.out(
     f"\n```bash\n$ xbmini --help\n{out.stdout.rstrip()}\n```\n\n"
 )
