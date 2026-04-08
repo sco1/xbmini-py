@@ -2,6 +2,12 @@
 
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (`<major>`.`<minor>`.`<patch>`)
 
+## `[v0.5.2]`
+
+### Fixed
+
+* #53 Fix issue with header skipping when ingesting raw log files.
+
 ## `[v0.5.1]`
 
 ### Fixed
