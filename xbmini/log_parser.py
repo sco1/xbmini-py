@@ -167,6 +167,7 @@ def load_log(
         new_columns=header_info.header_spec,
         comment_prefix=";",
         schema=schema,
+        missing_columns="insert",
     )
 
     # For IMU-GPS, preserve UTC timestamp as a datetime instance
